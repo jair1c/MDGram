@@ -1,0 +1,27 @@
+.idea/
+.gradle/
+build/
+obj/
+*.iml
+local.properties
+TMessagesProj/.cxx/
+TMessagesProj/jniLibs/
+TMessagesProj/jniRes/
+**/.DS_Store
+TMessagesProj/afat/
+TMessagesProj_App/afat/
+TMessagesProj_AppHockeyApp/afat/
+TMessagesProj_AppStandalone/afat/
+TMessagesProj_AppHuawei/afat/
+
+# MDGram: firma de release — nunca subir credenciales ni la keystore propia
+keystore.properties
+*.jks
+
+# MDGram: config Firebase (heredada de NekoX) — no se publica; cada quien pone la suya
+google-services.json
+
+# MDGram: logs de build + notas internas de desarrollo — no van al repo público
+build_mdgram*.log
+*.log
+SESSION_NOTES.md
