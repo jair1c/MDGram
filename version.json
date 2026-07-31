@@ -1,6 +1,6 @@
 {
-  "versionCode": 1,
-  "versionName": "V1",
-  "changelog": "Primera versión pública de MDGram.",
-  "apkUrl": "https://github.com/jair1c/MDGram/releases/download/v1/MDGram-V1-universal.apk"
+  "versionCode": 2,
+  "versionName": "V2",
+  "changelog": "• Nueva sección Pantalla principal: título de inicio y ocultar botón flotante\n• Créditos actualizados (Cherrygram, OwlGram, OctoGram)\n• Mejoras internas y APK más liviano",
+  "apkUrl": "https://github.com/jair1c/MDGram/releases/latest/download/MDGram-universal.apk"
 }
