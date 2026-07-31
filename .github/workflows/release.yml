@@ -1,0 +1,114 @@
+name: Build & Release
+
+# Automatiza el ciclo de release de MDGram:
+#   compila los APK firmados (universal + arm64 + armv7a) -> crea el release -> actualiza version.json.
+# Disparo MANUAL desde la pestaña Actions ("Run workflow") rellenando versión + changelog.
+#
+# Requiere estos SECRETS en el repo (Settings -> Secrets and variables -> Actions):
+#   MDGRAM_KEYSTORE_BASE64    -> tu mdgram-release.jks en base64
+#   MDGRAM_KEYSTORE_PASSWORD  -> la contraseña de la keystore
+#   GOOGLE_SERVICES_BASE64    -> un google-services.json en base64 (el de NekoX; se copia a cada módulo)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: "MDGram version code (número, ej. 2)"
+        required: true
+      version_name:
+        description: "MDGram version name (ej. V2)"
+        required: true
+      changelog:
+        description: "Changelog"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK & CMake
+        run: sdkmanager "ndk;21.4.7075529" "cmake;3.10.2.4988404"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle', 'gradle.properties') }}
+          restore-keys: gradle-
+
+      - name: Restore keystore + keystore.properties
+        run: |
+          mkdir -p keys
+          echo "${{ secrets.MDGRAM_KEYSTORE_BASE64 }}" | base64 -d > keys/mdgram-release.jks
+          cat > keystore.properties <<EOF
+          RELEASE_STORE_FILE=keys/mdgram-release.jks
+          RELEASE_KEY_ALIAS=mdgram
+          RELEASE_STORE_PASSWORD=${{ secrets.MDGRAM_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_PASSWORD=${{ secrets.MDGRAM_KEYSTORE_PASSWORD }}
+          EOF
+
+      - name: Restore google-services.json (a cada módulo)
+        run: |
+          echo "${{ secrets.GOOGLE_SERVICES_BASE64 }}" | base64 -d > TMessagesProj/google-services.json
+          for m in TMessagesProj_App TMessagesProj_AppHockeyApp TMessagesProj_AppHuawei TMessagesProj_AppStandalone; do
+            cp TMessagesProj/google-services.json "$m/google-services.json"
+          done
+
+      - name: Build signed APKs
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx5g"
+        run: |
+          chmod +x gradlew
+          # -Xmx alto para el runner (la gradle.properties local usa 1536m por la laptop del dev)
+          sed -i 's/-Xmx1536m/-Xmx5g/' gradle.properties || true
+          ./gradlew :TMessagesProj_AppStandalone:assembleAfatStandalone -PabiSplits \
+            -PMDGRAM_VERSION_CODE=${{ inputs.version_code }} \
+            -PMDGRAM_VERSION_NAME=${{ inputs.version_name }} --no-daemon
+
+      - name: Rename APKs (sin versión, para los permalinks "latest")
+        run: |
+          cd TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone
+          cp app-universal.apk   MDGram-universal.apk
+          cp app-arm64-v8a.apk   MDGram-arm64.apk
+          cp app-armeabi-v7a.apk MDGram-armv7a.apk
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone
+          gh release create "${{ inputs.version_name }}" \
+            --repo "${{ github.repository }}" \
+            --title "MDGram ${{ inputs.version_name }}" \
+            --notes "${{ inputs.changelog }}" \
+            MDGram-universal.apk MDGram-arm64.apk MDGram-armv7a.apk
+
+      - name: Update version.json (fuente de verdad del updater)
+        run: |
+          jq -n \
+            --argjson vc ${{ inputs.version_code }} \
+            --arg vn "${{ inputs.version_name }}" \
+            --arg cl "${{ inputs.changelog }}" \
+            '{versionCode:$vc, versionName:$vn, changelog:$cl, apkUrl:"https://github.com/jair1c/MDGram/releases/latest/download/MDGram-universal.apk"}' \
+            > version.json
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add version.json
+          git commit -m "version.json ${{ inputs.version_name }}"
+          git push

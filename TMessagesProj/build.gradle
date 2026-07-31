@@ -107,6 +107,11 @@ android {
 
         multiDexEnabled true
 
+        // MDGram: versión propia del mod expuesta a BuildConfig (fuente única = gradle.properties,
+        // sobreescribible por el CI con -PMDGRAM_VERSION_CODE / -PMDGRAM_VERSION_NAME). La lee MDGramUpdater.
+        buildConfigField "int", "MDGRAM_VERSION_CODE", MDGRAM_VERSION_CODE
+        buildConfigField "String", "MDGRAM_VERSION_NAME", "\"" + MDGRAM_VERSION_NAME + "\""
+
         externalNativeBuild {
             cmake {
                 version '3.10.2'

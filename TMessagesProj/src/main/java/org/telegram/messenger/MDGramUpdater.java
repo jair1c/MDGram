@@ -14,10 +14,11 @@ import java.net.URL;
 public class MDGramUpdater {
 
     // Versión MDGram PROPIA — independiente del versionCode de Telegram (que se multiplica por ABI en
-    // build.gradle: versionCode*10 + abiVersionCode). INCREMENTAR en cada release publicado; el
-    // manifiesto remoto compara su "versionCode" contra esto. Al publicar, mover a un buildConfigField.
-    public static final int MD_VERSION_CODE = 1;
-    public static final String MD_VERSION_NAME = "V1";
+    // build.gradle: versionCode*10 + abiVersionCode). El manifiesto remoto compara su "versionCode"
+    // contra esto. FUENTE ÚNICA: gradle.properties (MDGRAM_VERSION_CODE / MDGRAM_VERSION_NAME), expuesta
+    // vía BuildConfig — el CI la sobreescribe con -PMDGRAM_VERSION_CODE=N. Subir SOLO ahí en cada release.
+    public static final int MD_VERSION_CODE = BuildConfig.MDGRAM_VERSION_CODE;
+    public static final String MD_VERSION_NAME = BuildConfig.MDGRAM_VERSION_NAME;
 
     // Manifiesto remoto de versión (JSON). Formato esperado:
     // { "versionCode": 2, "versionName": "V2", "changelog": "…", "apkUrl": "https://…/app.apk" }
