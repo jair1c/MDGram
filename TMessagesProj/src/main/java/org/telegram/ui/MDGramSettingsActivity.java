@@ -97,7 +97,7 @@ public class MDGramSettingsActivity extends BaseFragment {
 
         LinearLayout row2 = new LinearLayout(context);
         row2.setOrientation(LinearLayout.HORIZONTAL);
-        row2.addView(makeGridCard(context, R.drawable.md_sett_home, C_HOME, "Pantalla principal", () -> soon("Pantalla principal")), gridLp(true));
+        row2.addView(makeGridCard(context, R.drawable.md_sett_home, C_HOME, "Pantalla principal", () -> presentFragment(new HomeSettingsActivity())), gridLp(true));
         row2.addView(makeGridCard(context, R.drawable.md_sett_others, C_MODS, "Otros mods", () -> presentFragment(new OtrosModsSettingsActivity())), gridLp(false));
         content.addView(row2, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 0));
 

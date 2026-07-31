@@ -248,4 +248,22 @@ public class MDGramConfig {
     public static void setActionBarStyle(int v) {
         prefs().edit().putInt("actionbar_style", v).apply();
     }
+
+    // ---- Pantalla principal → "Título de inicio": muestra tu nombre en vez de "MDGram" en la lista de chats. Default OFF.
+    public static boolean homeTitleAsName() {
+        return prefs().getBoolean("home_title_name", false);
+    }
+
+    public static void setHomeTitleAsName(boolean v) {
+        prefs().edit().putBoolean("home_title_name", v).apply();
+    }
+
+    // ---- Pantalla principal → "Ocultar botón flotante" (FAB, solo en la lista de chats principal). Default OFF.
+    public static boolean hideFab() {
+        return prefs().getBoolean("hide_fab", false);
+    }
+
+    public static void setHideFab(boolean v) {
+        prefs().edit().putBoolean("hide_fab", v).apply();
+    }
 }

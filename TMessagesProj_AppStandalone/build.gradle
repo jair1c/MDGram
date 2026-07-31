@@ -114,7 +114,8 @@ android {
     productFlavors {
         afat {
             ndk {
-                abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+                // MDGram: dropeados x86/x86_64 (casi ningún teléfono real los usa) → build ~más rápido + universal más liviano
+                abiFilters "armeabi-v7a", "arm64-v8a"
             }
             ext {
                 abiVersionCode = 9

@@ -3493,7 +3493,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             } else {
                 statusDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(null, dp(26));
                 statusDrawable.center = true;
-                actionBar.setTitle("MDGram", statusDrawable);
+                // MDGram: "Título de inicio" (Pantalla principal) → nombre del usuario en vez de "MDGram"
+                String homeTitle = "MDGram";
+                if (org.telegram.messenger.MDGramConfig.homeTitleAsName()) {
+                    TLRPC.User selfUser = UserConfig.getInstance(currentAccount).getCurrentUser();
+                    if (selfUser != null) {
+                        homeTitle = UserObject.getUserName(selfUser);
+                    }
+                }
+                actionBar.setTitle(homeTitle, statusDrawable);
                 actionBar.centerTitle(); // centrar el título en la barra como el MDGram original
                 updateStatus(UserConfig.getInstance(currentAccount).getCurrentUser(), false);
             }
@@ -8655,7 +8663,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     private void updateFloatingButtonVisibility(boolean animated) {
-        final boolean isVisible = !(onlySelect && initialDialogsType != 10 || folderId != 0 || inPreviewMode || (searching && !onlySelect) || floatingButtonHidden);
+        // MDGram: "Ocultar botón flotante" (Pantalla principal) — solo en la lista de chats principal
+        final boolean mdHideFab = org.telegram.messenger.MDGramConfig.hideFab() && !onlySelect && folderId == 0 && initialDialogsType == 0;
+        final boolean isVisible = !(onlySelect && initialDialogsType != 10 || folderId != 0 || inPreviewMode || (searching && !onlySelect) || floatingButtonHidden) && !mdHideFab;
 
         if (floatingButton3 != null) {
             floatingButton3.setButtonVisible(isVisible, animated);

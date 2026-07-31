@@ -112,6 +112,11 @@ android {
         buildConfigField "int", "MDGRAM_VERSION_CODE", MDGRAM_VERSION_CODE
         buildConfigField "String", "MDGRAM_VERSION_NAME", "\"" + MDGRAM_VERSION_NAME + "\""
 
+        // MDGram: dropeados x86/x86_64 también en el módulo base → el CMake no los compila (build más rápido)
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a"
+        }
+
         externalNativeBuild {
             cmake {
                 version '3.10.2'

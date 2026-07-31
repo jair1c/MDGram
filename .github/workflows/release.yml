@@ -80,7 +80,7 @@ jobs:
         run: |
           chmod +x gradlew
           # -Xmx alto para el runner (la gradle.properties local usa 1536m por la laptop del dev)
-          sed -i 's/-Xmx1536m/-Xmx5g/' gradle.properties || true
+          sed -i -E 's/-Xmx[0-9]+m/-Xmx5g/' gradle.properties || true
           ./gradlew :TMessagesProj_AppStandalone:assembleAfatStandalone -PabiSplits \
             -PMDGRAM_VERSION_CODE=${{ inputs.version_code }} \
             -PMDGRAM_VERSION_NAME=${{ inputs.version_name }} --no-daemon
