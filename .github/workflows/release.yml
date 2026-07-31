@@ -61,7 +61,7 @@ jobs:
           mkdir -p keys
           echo "${{ secrets.MDGRAM_KEYSTORE_BASE64 }}" | base64 -d > keys/mdgram-release.jks
           cat > keystore.properties <<EOF
-          RELEASE_STORE_FILE=keys/mdgram-release.jks
+          RELEASE_STORE_FILE=${{ github.workspace }}/keys/mdgram-release.jks
           RELEASE_KEY_ALIAS=mdgram
           RELEASE_STORE_PASSWORD=${{ secrets.MDGRAM_KEYSTORE_PASSWORD }}
           RELEASE_KEY_PASSWORD=${{ secrets.MDGRAM_KEYSTORE_PASSWORD }}
