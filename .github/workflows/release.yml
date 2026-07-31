@@ -117,7 +117,7 @@ jobs:
             --argjson vc ${{ inputs.version_code }} \
             --arg vn "${{ inputs.version_name }}" \
             --arg cl "${{ inputs.changelog }}" \
-            '{versionCode:$vc, versionName:$vn, changelog:$cl, apkUrl:"https://github.com/jair1c/MDGram/releases/latest/download/MDGram-universal.apk"}' \
+            '{versionCode:$vc, versionName:$vn, changelog:$cl, apkUrl:"https://mdgram-web.vercel.app/dl"}' \
             > version.json
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
