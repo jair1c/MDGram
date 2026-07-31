@@ -21,6 +21,10 @@ on:
       changelog:
         description: "Changelog"
         required: true
+      dry_run:
+        description: "Prueba (compila y firma pero NO publica release ni version.json)"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -88,7 +92,14 @@ jobs:
           cp app-arm64-v8a.apk   MDGram-arm64.apk
           cp app-armeabi-v7a.apk MDGram-armv7a.apk
 
+      - name: Upload APKs as artifacts (para revisar en dry run)
+        uses: actions/upload-artifact@v4
+        with:
+          name: MDGram-${{ inputs.version_name }}-apks
+          path: TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/MDGram-*.apk
+
       - name: Create GitHub Release
+        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -100,6 +111,7 @@ jobs:
             MDGram-universal.apk MDGram-arm64.apk MDGram-armv7a.apk
 
       - name: Update version.json (fuente de verdad del updater)
+        if: ${{ !inputs.dry_run }}
         run: |
           jq -n \
             --argjson vc ${{ inputs.version_code }} \
