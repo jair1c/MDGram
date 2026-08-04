@@ -1,6 +1,6 @@
 {
-  "versionCode": 2,
-  "versionName": "V2",
-  "changelog": "• Nueva sección Pantalla principal: título de inicio y ocultar botón flotante\n• Créditos actualizados (Cherrygram, OwlGram, OctoGram)\n• Mejoras internas y APK más liviano",
+  "versionCode": 3,
+  "versionName": "V3",
+  "changelog": "• Instalador de actualizaciones dentro de la app (ya no abre el navegador)\n• Aviso automático al abrir la app cuando hay una versión nueva\n• Mejoras varias",
   "apkUrl": "https://mdgram-web.vercel.app/dl"
 }
