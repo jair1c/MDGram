@@ -1369,6 +1369,9 @@ public class PremiumPreviewFragment extends BaseFragment implements Notification
 
     @Override
     public boolean onFragmentCreate() {
+        if (org.telegram.messenger.MDGramConfig.hidePremiumScreens()) {
+            return false; // MDGram: no abrir la página de comprar Premium
+        }
         if (getMessagesController().premiumFeaturesBlocked()) {
             return false;
         }

@@ -276,4 +276,15 @@ public class MDGramConfig {
     public static void setLastDismissedUpdate(int versionCode) {
         prefs().edit().putInt("last_dismissed_update", versionCode).apply();
     }
+
+    // ---- Otros Mods → "Ocultar pantallas de comprar Premium". Con ON, se bloquean las pantallas puras
+    // de compra (PremiumPreviewFragment + PremiumFeatureBottomSheet) → cualquier botón que las abra no
+    // hace nada. NO afecta límites ni funciones del servidor. Default OFF.
+    public static boolean hidePremiumScreens() {
+        return prefs().getBoolean("hide_premium_screens", false);
+    }
+
+    public static void setHidePremiumScreens(boolean v) {
+        prefs().edit().putBoolean("hide_premium_screens", v).apply();
+    }
 }

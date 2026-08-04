@@ -55,7 +55,7 @@ public class OtrosModsSettingsActivity extends BaseFragment {
 
         // Notificación persistente (FUNCIONAL → MDGramResidentService)
         TextCheckCell resident = new TextCheckCell(context);
-        resident.setTextAndCheck("Mostrar notificación persistente", MDGramConfig.residentNotification(), false);
+        resident.setTextAndCheck("Mostrar notificación persistente", MDGramConfig.residentNotification(), true);
         resident.setOnClickListener(v -> {
             boolean c = !resident.isChecked();
             resident.setChecked(c);
@@ -64,8 +64,18 @@ public class OtrosModsSettingsActivity extends BaseFragment {
         });
         group.addView(resident);
 
+        // Ocultar pantallas de comprar Premium (FUNCIONAL → gatea PremiumPreviewFragment + PremiumFeatureBottomSheet)
+        TextCheckCell hidePremium = new TextCheckCell(context);
+        hidePremium.setTextAndValueAndCheck("Ocultar pantallas de Premium", "Bloquea las pantallas de comprar Telegram Premium", MDGramConfig.hidePremiumScreens(), true, false);
+        hidePremium.setOnClickListener(v -> {
+            boolean c = !hidePremium.isChecked();
+            hidePremium.setChecked(c);
+            MDGramConfig.setHidePremiumScreens(c);
+        });
+        group.addView(hidePremium);
+
         TextInfoPrivacyCell info = new TextInfoPrivacyCell(context);
-        info.setText("Muestra una notificación fija para mantener MDGram ejecutándose en segundo plano y recibir mensajes con más fiabilidad.");
+        info.setText("La notificación persistente mantiene MDGram en segundo plano. Ocultar pantallas de Premium bloquea las pantallas de compra (no afecta los límites del servidor).");
         content.addView(info);
 
         fragmentView = root;

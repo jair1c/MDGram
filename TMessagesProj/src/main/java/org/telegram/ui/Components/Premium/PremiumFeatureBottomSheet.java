@@ -582,6 +582,9 @@ public class PremiumFeatureBottomSheet extends BottomSheet implements Notificati
 
     @Override
     public void show() {
+        if (org.telegram.messenger.MDGramConfig.hidePremiumScreens()) {
+            return; // MDGram: no mostrar el carrusel de features premium
+        }
         super.show();
         NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.stopAllHeavyOperations, 16);
     }
