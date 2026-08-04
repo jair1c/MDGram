@@ -1,6 +1,6 @@
 {
-  "versionCode": 3,
-  "versionName": "V3",
-  "changelog": "• Instalador de actualizaciones dentro de la app (ya no abre el navegador)\n• Aviso automático al abrir la app cuando hay una versión nueva\n• Mejoras varias",
+  "versionCode": 4,
+  "versionName": "V4",
+  "changelog": "• Nueva opción para ocultar las pantallas de comprar Telegram Premium (Ajustes de MDGram → Otros Mods)\n• Mejoras internas",
   "apkUrl": "https://mdgram-web.vercel.app/dl"
 }
