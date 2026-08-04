@@ -607,6 +607,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
     private ArrayList<TLRPC.Dialog> frozenDialogsList;
     private boolean dialogsListFrozen;
+    private static boolean mdUpdateAutoChecked = false; // MDGram: auto-chequeo de updates una vez por sesión
 
     private AlertDialog permissionDialog;
     private boolean askAboutContacts = true;
@@ -6922,9 +6923,26 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
     }
 
+    // MDGram: al abrir la app (lista de chats principal), chequea updates una vez por sesión y muestra
+    // la hoja del instalador si hay versión nueva no descartada. Silencioso; no molesta si falla.
+    private void mdCheckUpdateOnLaunch() {
+        if (mdUpdateAutoChecked || onlySelect || folderId != 0 || initialDialogsType != 0 || inPreviewMode) {
+            return;
+        }
+        mdUpdateAutoChecked = true;
+        AndroidUtilities.runOnUIThread(() -> org.telegram.messenger.MDGramUpdater.checkForUpdate((info, error) -> {
+            if (info != null && info.isNewer
+                    && info.versionCode > org.telegram.messenger.MDGramConfig.lastDismissedUpdate()
+                    && getParentActivity() != null) {
+                MDGramUpdateSheet.show(getParentActivity(), info, false);
+            }
+        }), 2500);
+    }
+
     @Override
     public void onResume() {
         super.onResume();
+        mdCheckUpdateOnLaunch();
         if (dialogStoriesCell != null) {
             dialogStoriesCell.onResume();
         }

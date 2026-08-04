@@ -7,8 +7,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.RadialGradient;
+import android.graphics.RectF;
 import android.graphics.Shader;
 import android.net.Uri;
 import android.util.TypedValue;
@@ -18,6 +20,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.core.graphics.ColorUtils;
 
@@ -28,9 +31,14 @@ import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ActionBar.ThemeColors;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Components.LineProgressView;
+
+import java.io.File;
 
 // MDGram: celda "Actualizar" rediseñada estilo One UI 8.5 "Software update" — fondo plano,
 // resplandor radial (aurora) teal/ámbar detrás del logo, botón píldora "Buscar actualización".
@@ -142,7 +150,7 @@ public class UpdateActivity extends BaseFragment {
             if (info != null) {
                 if (info.isNewer) {
                     statusView.setText("Actualización disponible: MDGram " + info.versionName);
-                    showUpdateDialog(info);
+                    showUpdateSheet(info);
                 } else {
                     statusView.setText("Estás en la última versión.");
                 }
@@ -152,27 +160,10 @@ public class UpdateActivity extends BaseFragment {
         });
     }
 
-    private void showUpdateDialog(MDGramUpdater.UpdateInfo info) {
-        if (getParentActivity() == null) {
-            return;
-        }
-        AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity());
-        b.setTitle("Actualización disponible");
-        String msg = "MDGram " + info.versionName;
-        if (info.changelog != null && info.changelog.length() > 0) {
-            msg += "\n\n" + info.changelog;
-        }
-        b.setMessage(msg);
-        b.setPositiveButton("Descargar", (d, w) -> {
-            if (info.apkUrl != null && info.apkUrl.length() > 0 && getParentActivity() != null) {
-                try {
-                    getParentActivity().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(info.apkUrl)));
-                } catch (Exception ignored) {
-                }
-            }
-        });
-        b.setNegativeButton("Ahora no", null);
-        showDialog(b.create());
+    // Hoja del instalador in-app (chequeo manual → siempre se muestra). El código vive en MDGramUpdateSheet
+    // (reutilizable: también lo usa el auto-chequeo al abrir la app desde DialogsActivity).
+    private void showUpdateSheet(MDGramUpdater.UpdateInfo info) {
+        MDGramUpdateSheet.show(getParentActivity(), info, true);
     }
 
     // Menú de 3 puntos → notas de la versión (changelog del manifiesto remoto).

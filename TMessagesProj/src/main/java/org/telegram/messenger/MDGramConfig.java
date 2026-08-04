@@ -266,4 +266,14 @@ public class MDGramConfig {
     public static void setHideFab(boolean v) {
         prefs().edit().putBoolean("hide_fab", v).apply();
     }
+
+    // ---- Updater: última versión que el usuario descartó con "Ahora no" (el auto-chequeo no re-molesta
+    // por esa versión; el chequeo manual en la celda Actualizar la muestra igual). Default 0.
+    public static int lastDismissedUpdate() {
+        return prefs().getInt("last_dismissed_update", 0);
+    }
+
+    public static void setLastDismissedUpdate(int versionCode) {
+        prefs().edit().putInt("last_dismissed_update", versionCode).apply();
+    }
 }

@@ -1,8 +1,19 @@
 package org.telegram.messenger;
 
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.Settings;
+
+import androidx.core.content.FileProvider;
+
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -81,5 +92,125 @@ public class MDGramUpdater {
             final String fError = error;
             AndroidUtilities.runOnUIThread(() -> cb.onResult(fResult, fError));
         });
+    }
+
+    // ---- Descarga in-app del APK + instalación (para no abrir el navegador ni mostrar GitHub) ----
+
+    public interface DownloadListener {
+        void onProgress(long downloaded, long total); // bytes; total=-1 si desconocido
+        void onComplete(File apk);
+        void onError(String error);
+    }
+
+    public static volatile boolean cancelDownload = false;
+
+    // Descarga apkUrl a filesDir/cache/mdgram_update.apk (servible por el FileProvider ya existente).
+    // Sigue redirects a mano (Vercel /dl 308 → GitHub 302 → S3) porque HttpURLConnection no sigue 307/308 solo.
+    public static void downloadApk(String apkUrl, DownloadListener listener) {
+        cancelDownload = false;
+        Utilities.globalQueue.postRunnable(() -> {
+            HttpURLConnection conn = null;
+            File cacheDir = new File(ApplicationLoader.applicationContext.getFilesDir(), "cache");
+            cacheDir.mkdirs();
+            File outFile = new File(cacheDir, "mdgram_update.apk");
+            try {
+                String current = apkUrl;
+                int redirects = 0;
+                while (true) {
+                    conn = (HttpURLConnection) new URL(current).openConnection();
+                    conn.setInstanceFollowRedirects(false);
+                    conn.setConnectTimeout(20000);
+                    conn.setReadTimeout(30000);
+                    conn.setRequestProperty("User-Agent", "MDGram-Updater");
+                    int code = conn.getResponseCode();
+                    if (code >= 300 && code < 400) {
+                        String loc = conn.getHeaderField("Location");
+                        conn.disconnect();
+                        conn = null;
+                        if (loc == null || ++redirects > 6) {
+                            throw new Exception("too many redirects");
+                        }
+                        current = loc;
+                        continue;
+                    }
+                    if (code != 200) {
+                        throw new Exception("HTTP " + code);
+                    }
+                    break;
+                }
+                long total = conn.getContentLength();
+                InputStream in = conn.getInputStream();
+                FileOutputStream out = new FileOutputStream(outFile);
+                byte[] buf = new byte[32768];
+                long downloaded = 0;
+                long lastReport = 0;
+                int read;
+                while ((read = in.read(buf)) != -1) {
+                    if (cancelDownload) {
+                        out.close();
+                        in.close();
+                        outFile.delete();
+                        return; // cancelado en silencio
+                    }
+                    out.write(buf, 0, read);
+                    downloaded += read;
+                    long now = System.currentTimeMillis();
+                    if (now - lastReport > 80) {
+                        final long d = downloaded, t = total;
+                        AndroidUtilities.runOnUIThread(() -> listener.onProgress(d, t));
+                        lastReport = now;
+                    }
+                }
+                out.flush();
+                out.close();
+                in.close();
+                final long d = downloaded, t = total;
+                final File f = outFile;
+                AndroidUtilities.runOnUIThread(() -> {
+                    listener.onProgress(d, t);
+                    listener.onComplete(f);
+                });
+            } catch (Exception e) {
+                final String err = e.getMessage() != null ? e.getMessage() : "error";
+                AndroidUtilities.runOnUIThread(() -> listener.onError(err));
+            } finally {
+                if (conn != null) {
+                    conn.disconnect();
+                }
+            }
+        });
+    }
+
+    // ¿Puede la app instalar APKs? (Android 8+ exige el permiso "instalar de esta fuente" por app).
+    public static boolean canInstall(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            return context.getPackageManager().canRequestPackageInstalls();
+        }
+        return true;
+    }
+
+    // Manda al usuario a activar "instalar apps de esta fuente" para MDGram.
+    public static void requestInstallPermission(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                Intent i = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + context.getPackageName()));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(i);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    // Lanza el diálogo de instalación nativo de Android con el APK descargado (vía FileProvider).
+    public static void installApk(Context context, File apk) {
+        try {
+            Uri uri = FileProvider.getUriForFile(context, context.getPackageName() + ".provider", apk);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(uri, "application/vnd.android.package-archive");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception ignored) {
+        }
     }
 }
