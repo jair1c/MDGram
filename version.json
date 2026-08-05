@@ -1,6 +1,6 @@
 {
-  "versionCode": 4,
-  "versionName": "V4",
-  "changelog": "• Nueva opción para ocultar las pantallas de comprar Telegram Premium (Ajustes de MDGram → Otros Mods)\n• Mejoras internas",
+  "versionCode": 5,
+  "versionName": "V4.1",
+  "changelog": "• Nuevos estilos de burbuja de chat: Redondas (Telegram), Bubbles Messenger y Burbujas de iOS. Cámbialos en Ajustes de MDGram → Conversación → Estilos.\n• Ícono de notificación propio de MDGram.\n• Correcciones internas en Acerca de MDGram.",
   "apkUrl": "https://mdgram-web.vercel.app/dl"
 }
