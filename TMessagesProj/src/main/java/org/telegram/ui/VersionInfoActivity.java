@@ -67,7 +67,7 @@ public class VersionInfoActivity extends BaseFragment {
             tgVersion = pInfo.versionName;
         } catch (Exception ignored) {
         }
-        versionView.setText("MDGram: V1 || TG: " + tgVersion);
+        versionView.setText("MDGram: " + org.telegram.messenger.MDGramUpdater.MD_VERSION_NAME + " || TG: " + tgVersion);
         versionView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
         versionView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
         versionView.setGravity(Gravity.CENTER);

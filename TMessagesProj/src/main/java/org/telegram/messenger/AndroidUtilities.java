@@ -6686,7 +6686,7 @@ public class AndroidUtilities {
                     }
                     break;
             }
-            return String.format(Locale.US, "MDGram V1 || TG Base %s || %s", pInfo.versionName, abi);
+            return String.format(Locale.US, "MDGram %s || TG Base %s || %s", MDGramUpdater.MD_VERSION_NAME, pInfo.versionName, abi);
         } catch (Exception e) {
             FileLog.e(e);
         }

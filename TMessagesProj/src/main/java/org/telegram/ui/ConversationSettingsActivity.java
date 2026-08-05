@@ -31,6 +31,7 @@ public class ConversationSettingsActivity extends BaseFragment {
 
     private TextSettingsCell stickerSizeCell;
     private TextSettingsCell actionBarStyleCell;
+    private TextSettingsCell bubbleStyleCell;
     private View blurIntensityCell;
 
     @Override
@@ -123,7 +124,11 @@ public class ConversationSettingsActivity extends BaseFragment {
             cell.setChecked(c);
             MDGramConfig.setLargePhotos(c);
         });
-        addValue(context, styleGroup, "Estilos de burbuja", null, true, () -> soon("Estilos de burbuja"));
+        // Estilos de burbuja (FUNCIONAL → forma de la burbuja en Theme.MessageDrawable.generatePath)
+        bubbleStyleCell = new TextSettingsCell(context);
+        bubbleStyleCell.setTextAndValue("Estilos de burbuja", bubbleStyleName(MDGramConfig.bubbleStyle()), true);
+        bubbleStyleCell.setOnClickListener(v -> showBubbleStylePicker());
+        styleGroup.addView(bubbleStyleCell);
         // Estilos de barra superior (FUNCIONAL → gatea el header centrado iOS vs Material en ChatActivity)
         actionBarStyleCell = new TextSettingsCell(context);
         actionBarStyleCell.setTextAndValue("Estilos de barra superior", actionBarStyleName(MDGramConfig.actionBarStyle()), false);
@@ -255,6 +260,31 @@ public class ConversationSettingsActivity extends BaseFragment {
         b.setItems(new CharSequence[]{"Pequeño", "Normal", "Grande"}, (d, which) -> {
             MDGramConfig.setStickerSizeLevel(which);
             stickerSizeCell.setTextAndValue("Tamaño de sticker", stickerSizeName(which), true);
+        });
+        showDialog(b.create());
+    }
+
+    private String bubbleStyleName(int style) {
+        switch (style) {
+            case MDGramConfig.BUBBLE_MESSENGER: return "Bubbles Messenger";
+            case MDGramConfig.BUBBLE_IOS: return "Burbujas de iOS";
+            default: return "Redondas TG";
+        }
+    }
+
+    private void showBubbleStylePicker() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity());
+        b.setTitle("Estilos de burbuja");
+        // Los índices coinciden con las constantes: 0=TG, 1=Messenger, 2=iOS
+        b.setItems(new CharSequence[]{"Redondas TG", "Bubbles Messenger", "Burbujas de iOS"}, (d, which) -> {
+            MDGramConfig.setBubbleStyle(which);
+            bubbleStyleCell.setTextAndValue("Estilos de burbuja", bubbleStyleName(which), true);
+            if (getParentActivity() != null) {
+                Toast.makeText(getParentActivity(), "Reabre el chat para aplicar", Toast.LENGTH_SHORT).show();
+            }
         });
         showDialog(b.create());
     }

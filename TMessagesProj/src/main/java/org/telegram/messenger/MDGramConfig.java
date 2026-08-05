@@ -249,6 +249,30 @@ public class MDGramConfig {
         prefs().edit().putInt("actionbar_style", v).apply();
     }
 
+    // ---- Conversación → Estilos → "Estilos de burbuja" (forma de la burbuja de mensaje).
+    // 0 = Redondas TG (forma por defecto de Telegram, con cola/ala — comportamiento stock, sin cambios).
+    // 1 = Messenger (píldora totalmente redondeada, SIN cola).
+    // 2 = iOS (cuerpo tipo píldora CON una colita estilo iMessage).
+    // Default 0 (TG) = fiel a Telegram base y RENDER IDÉNTICO al actual. Se lee dentro de
+    // Theme.MessageDrawable.generatePath (se dibuja en cada mensaje) → cacheado.
+    public static final int BUBBLE_TG = 0;
+    public static final int BUBBLE_MESSENGER = 1;
+    public static final int BUBBLE_IOS = 2;
+
+    private static Integer bubbleStyleCache;
+
+    public static int bubbleStyle() {
+        if (bubbleStyleCache == null) {
+            bubbleStyleCache = prefs().getInt("bubble_style", BUBBLE_TG);
+        }
+        return bubbleStyleCache;
+    }
+
+    public static void setBubbleStyle(int v) {
+        bubbleStyleCache = v;
+        prefs().edit().putInt("bubble_style", v).apply();
+    }
+
     // ---- Pantalla principal → "Título de inicio": muestra tu nombre en vez de "MDGram" en la lista de chats. Default OFF.
     public static boolean homeTitleAsName() {
         return prefs().getBoolean("home_title_name", false);

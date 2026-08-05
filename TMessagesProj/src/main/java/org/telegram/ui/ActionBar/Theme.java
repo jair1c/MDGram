@@ -89,6 +89,7 @@ import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.MDGramConfig;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
@@ -746,7 +747,11 @@ public class Theme {
 
         public void draw(Canvas canvas, Paint paintToUse) {
             Rect bounds = getBounds();
-            if (paintToUse == null && gradientShader == null && overrideRoundRadius == 0 && overrideRounding <= 0) {
+            // MDGram: para los estilos de burbuja custom (Messenger/iOS) NO usamos el NinePatch cacheado
+            // (su estiramiento distorsionaría la píldora/cola); dibujamos siempre la ruta con generatePath.
+            // El estilo TG mantiene el atajo del NinePatch (con su sombra) sin cambios.
+            if (paintToUse == null && gradientShader == null && overrideRoundRadius == 0 && overrideRounding <= 0
+                    && MDGramConfig.bubbleStyle() == MDGramConfig.BUBBLE_TG) {
                 Drawable background = getBackgroundDrawable();
                 if (background != null) {
                     background.setBounds(bounds);
@@ -864,6 +869,15 @@ public class Theme {
             int heightHalf = (bounds.height() - padding) >> 1;
             if (rad > heightHalf) {
                 rad = heightHalf;
+            }
+            // MDGram: estilos de burbuja (Messenger sin cola / iOS con colita). El estilo TG (default) cae
+            // al código stock de abajo SIN cambios. Se deja stock para TYPE_PREVIEW (miniatura del editor de
+            // temas) y para los estados con radio forzado (overrideRoundRadius/overrideRounding).
+            int mdBubbleStyle = MDGramConfig.bubbleStyle();
+            if (mdBubbleStyle != MDGramConfig.BUBBLE_TG && currentType != TYPE_PREVIEW
+                    && overrideRoundRadius == 0 && overrideRounding <= 0) {
+                generateMDBubblePath(path, bounds, padding, rad, nearRad, heightHalf, mdBubbleStyle);
+                return;
             }
             if (isOut) {
                 // LEFT-BOTTOM <- RIGHT-BOTTOM
@@ -985,6 +999,82 @@ public class Theme {
                         path.lineTo(bounds.left + dp(8), top - topY + currentBackgroundHeight);
                     }
                 }
+            }
+            path.close();
+        }
+
+        // MDGram: genera la forma de burbuja para los estilos Messenger (píldora sin cola) e iOS (píldora
+        // con colita estilo iMessage). Se dibuja SIEMPRE la forma completa (ignora la optimización parcial
+        // drawFullTop/drawFullBottom, que draw() de todas formas pasa siempre en true). Respeta las esquinas
+        // "near" de mensajes agrupados (nearRad) para que se peguen igual que en el estilo stock. Los mensajes
+        // de multimedia (fotos/videos) se dibujan como rectángulo redondeado sin cola en ambos estilos.
+        private void generateMDBubblePath(Path path, Rect bounds, int padding, int rad, int nearRad, int heightHalf, int style) {
+            int l = bounds.left + padding;
+            int r = bounds.right - padding;
+            int t = bounds.top + padding;
+            int b = bounds.bottom - padding;
+            boolean media = currentType == TYPE_MEDIA;
+
+            // Radio por esquina = el mismo radio de Telegram (rad = dp(bubbleRadius), tope 17dp, ya limitado
+            // a heightHalf por el llamador). NO usar heightHalf directo: en burbujas altas (multilínea) daría
+            // un radio enorme que se come el área del contenido (el texto se laya con el padding stock) y el
+            // mensaje se sale de la burbuja. Las esquinas "near" (mensaje agrupado) usan nearRad para pegarse.
+            int topRad = isTopNear ? nearRad : rad;
+            int botRad = (isBottomNear || botButtonsBottom) ? nearRad : rad;
+            if (topRad > heightHalf) topRad = heightHalf;
+            if (botRad > heightHalf) botRad = heightHalf;
+            if (topRad < 0) topRad = 0;
+            if (botRad < 0) botRad = 0;
+
+            if (style == MDGramConfig.BUBBLE_MESSENGER || media) {
+                // Rectángulo redondeado sin cola (radios por esquina: TL, TR, BR, BL).
+                float[] radii = new float[]{
+                        topRad, topRad,
+                        topRad, topRad,
+                        botRad, botRad,
+                        botRad, botRad
+                };
+                rect.set(l, t, r, b);
+                path.addRoundRect(rect, radii, Path.Direction.CW);
+                return;
+            }
+
+            // BUBBLE_IOS (texto): píldora con una colita del lado de la burbuja. Reserva dp(8) para la cola
+            // (igual que el estilo TG), la punta queda a dp(2) del borde (dentro de bounds).
+            if (isOut) {
+                int bodyEdge = bounds.right - dp(8);
+                int tip = bounds.right - dp(2);
+                int tr = Math.min(topRad, Math.max(0, (bodyEdge - l) / 2));
+                int br = Math.min(botRad, Math.max(0, (bodyEdge - l) / 2));
+                path.moveTo(l + tr, t);
+                path.lineTo(bodyEdge - tr, t);
+                rect.set(bodyEdge - tr * 2, t, bodyEdge, t + tr * 2);
+                path.arcTo(rect, 270, 90, false);      // esquina superior derecha
+                path.lineTo(bodyEdge, b - dp(6));
+                path.quadTo(bodyEdge + dp(2), b, tip, b); // colita convexa hasta la punta
+                path.lineTo(l + br, b);
+                rect.set(l, b - br * 2, l + br * 2, b);
+                path.arcTo(rect, 90, 90, false);       // esquina inferior izquierda
+                path.lineTo(l, t + tr);
+                rect.set(l, t, l + tr * 2, t + tr * 2);
+                path.arcTo(rect, 180, 90, false);      // esquina superior izquierda
+            } else {
+                int bodyEdge = bounds.left + dp(8);
+                int tip = bounds.left + dp(2);
+                int tr = Math.min(topRad, Math.max(0, (r - bodyEdge) / 2));
+                int br = Math.min(botRad, Math.max(0, (r - bodyEdge) / 2));
+                path.moveTo(r - tr, t);
+                path.lineTo(bodyEdge + tr, t);
+                rect.set(bodyEdge, t, bodyEdge + tr * 2, t + tr * 2);
+                path.arcTo(rect, 270, -90, false);     // esquina superior izquierda
+                path.lineTo(bodyEdge, b - dp(6));
+                path.quadTo(bodyEdge - dp(2), b, tip, b); // colita convexa hasta la punta izquierda
+                path.lineTo(r - br, b);
+                rect.set(r - br * 2, b - br * 2, r, b);
+                path.arcTo(rect, 90, -90, false);      // esquina inferior derecha
+                path.lineTo(r, t + tr);
+                rect.set(r - tr * 2, t, r, t + tr * 2);
+                path.arcTo(rect, 0, -90, false);       // esquina superior derecha
             }
             path.close();
         }

@@ -210,7 +210,7 @@ public class AboutMDGramActivity extends UniversalFragment {
 
     private View createFooter(Context context) {
         TextView footer = new TextView(context);
-        footer.setText("MDGram V1");
+        footer.setText("MDGram " + org.telegram.messenger.MDGramUpdater.MD_VERSION_NAME);
         footer.setTypeface(AndroidUtilities.bold());
         footer.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
         footer.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
