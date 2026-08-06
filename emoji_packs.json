@@ -1,0 +1,11 @@
+{
+  "packs": [
+    {
+      "id": "google",
+      "name": "Google (Noto)",
+      "url": "https://github.com/jair1c/MDGram/releases/download/emoji-packs/google.zip",
+      "sizeMB": 18,
+      "count": 3331
+    }
+  ]
+}
