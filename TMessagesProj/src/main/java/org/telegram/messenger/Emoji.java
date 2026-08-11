@@ -114,14 +114,27 @@ public class Emoji {
             }
             loadingEmoji[page][page2] = true;
             Utilities.globalQueue.postRunnable(() -> {
-                Bitmap bitmap = loadBitmap("emoji/" + String.format(Locale.US, "%d_%d.png", page, page2));
+                // MDGram: si hay un pack de emoji custom activo, cargar el PNG del pack (con su propio alfa,
+                // SIN aplicar la máscara Apple); si falta ese archivo, caer al emoji horneado en assets.
+                Bitmap bitmap = null;
+                boolean customPack = false;
+                if (!MDGramConfig.isDefaultEmojiPack()) {
+                    String packPath = ApplicationLoader.applicationContext.getFilesDir()
+                            + "/emoji_packs/" + MDGramConfig.emojiPack()
+                            + "/" + String.format(Locale.US, "%d_%d.png", page, page2);
+                    bitmap = loadBitmapFile(packPath);
+                    customPack = bitmap != null;
+                }
+                if (bitmap == null) {
+                    bitmap = loadBitmap("emoji/" + String.format(Locale.US, "%d_%d.png", page, page2));
+                }
                 try {
-                    if (emojiAlphaMasks == null) {
+                    if (!customPack && emojiAlphaMasks == null) {
                         emojiAlphaMasks = loadEmojiAlphaMasks();
                     }
 
                     int maskIndex = -1;
-                    if (emojiAlphaMasks != null) {
+                    if (!customPack && emojiAlphaMasks != null) {
                         maskIndex = emojiAlphaMasks.get(page * 4096 + page2, -1);
                     }
 
@@ -228,6 +241,33 @@ public class Emoji {
             }
         }
         return null;
+    }
+
+    // MDGram: carga un PNG de emoji desde el filesystem (pack custom). Mismo inSampleSize que loadBitmap.
+    private static Bitmap loadBitmapFile(String path) {
+        try {
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inJustDecodeBounds = false;
+            opts.inSampleSize = AndroidUtilities.density <= 1.0f ? 2 : 1;
+            return BitmapFactory.decodeFile(path, opts);
+        } catch (Throwable e) {
+            return null;
+        }
+    }
+
+    // MDGram: descarta todos los bitmaps de emoji cargados para que se recarguen con el pack activo.
+    // Llamar en el hilo UI tras cambiar MDGramConfig.setEmojiPack(...). No se recyclan (podrían estar en
+    // un draw en curso); solo se anulan y el GC los libera. Las cargas en vuelo leen el pack actual dentro
+    // de su runnable, así que no reintroducen bitmaps del pack anterior.
+    public static void reloadEmoji() {
+        for (int a = 0; a < emojiBmp.length; a++) {
+            for (int b = 0; b < emojiBmp[a].length; b++) {
+                emojiBmp[a][b] = null;
+                loadingEmoji[a][b] = false;
+            }
+        }
+        AndroidUtilities.cancelRunOnUIThread(invalidateUiRunnable);
+        AndroidUtilities.runOnUIThread(invalidateUiRunnable);
     }
 
     public static void invalidateAll(View view) {

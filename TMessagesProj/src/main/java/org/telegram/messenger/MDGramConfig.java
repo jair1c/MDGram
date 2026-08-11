@@ -273,6 +273,28 @@ public class MDGramConfig {
         prefs().edit().putInt("bubble_style", v).apply();
     }
 
+    // ---- Conversación → Emojis → "Fuente de emoji personalizada": set de emoji activo.
+    // "default" = los emoji horneados en assets (estilo Apple). Cualquier otro valor = un pack instalado en
+    // filesDir/emoji_packs/{pack}/ (un PNG por emoji, mismo índice {page}_{page2} que assets). Cacheado
+    // porque Emoji.loadEmoji lo lee al cargar cada emoji. Al cambiar, llamar Emoji.reloadEmoji().
+    private static String emojiPackCache;
+
+    public static String emojiPack() {
+        if (emojiPackCache == null) {
+            emojiPackCache = prefs().getString("emoji_pack", "default");
+        }
+        return emojiPackCache;
+    }
+
+    public static boolean isDefaultEmojiPack() {
+        return "default".equals(emojiPack());
+    }
+
+    public static void setEmojiPack(String v) {
+        emojiPackCache = (v == null || v.isEmpty()) ? "default" : v;
+        prefs().edit().putString("emoji_pack", emojiPackCache).apply();
+    }
+
     // ---- Pantalla principal → "Título de inicio": muestra tu nombre en vez de "MDGram" en la lista de chats. Default OFF.
     public static boolean homeTitleAsName() {
         return prefs().getBoolean("home_title_name", false);

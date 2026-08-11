@@ -25,3 +25,7 @@ google-services.json
 build_mdgram*.log
 *.log
 SESSION_NOTES.md
+
+# MDGram: tooling/scratchpads locales de desarrollo (scripts Python, clones dispersos)
+scratchpad/
+scratchpad_bubbles/

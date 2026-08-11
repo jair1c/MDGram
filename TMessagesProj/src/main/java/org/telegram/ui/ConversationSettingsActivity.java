@@ -143,8 +143,8 @@ public class ConversationSettingsActivity extends BaseFragment {
             org.telegram.messenger.SharedConfig.toggleUseSystemEmoji();
             cell.setChecked(org.telegram.messenger.SharedConfig.useSystemEmoji);
         });
-        // Fuente de emoji personalizada / descargar más — parte difícil, aún placeholder
-        addValue(context, emojiGroup, "Fuente de emoji personalizada", null, false, () -> soon("Fuente de emoji personalizada"));
+        // Fuente de emoji personalizada / descargar más (FUNCIONAL → EmojiPacksActivity)
+        addValue(context, emojiGroup, "Fuente de emoji personalizada", null, false, () -> presentFragment(new EmojiPacksActivity()));
 
         TextInfoPrivacyCell info = new TextInfoPrivacyCell(context);
         info.setText("Más opciones de conversación (fuente de emoji, burbujas, barra superior) se irán agregando gradualmente.");
