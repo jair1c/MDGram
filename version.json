@@ -1,6 +1,6 @@
 {
-  "versionCode": 5,
-  "versionName": "V4.1",
-  "changelog": "• Nuevos estilos de burbuja de chat: Redondas (Telegram), Bubbles Messenger y Burbujas de iOS. Cámbialos en Ajustes de MDGram → Conversación → Estilos.\n• Ícono de notificación propio de MDGram.\n• Correcciones internas en Acerca de MDGram.",
+  "versionCode": 6,
+  "versionName": "V4.2",
+  "changelog": "Fuente de emoji personalizada (pack Google/Noto descargable) + selector de packs en Conversación → Emojis. Corrección: el botón de grabar (mic/cámara) ahora es visible en modo claro.",
   "apkUrl": "https://mdgram-web.vercel.app/dl"
 }
