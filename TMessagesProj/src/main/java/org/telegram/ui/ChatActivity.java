@@ -7891,6 +7891,8 @@ public class ChatActivity extends BaseFragment implements
         // derecha, mic plano sin círculo azul) en chats normales
         if (!isReport() && !inPreviewMode && !isInsideContainer) {
             chatActivityEnterView.applyMdChatBar();
+            // MDGram Etapa B2: fondo plano del campo (sin píldora/flotación) en el contenedor del input
+            chatInputViewsContainer.mdFlatBackground = true;
         }
         chatActivityEnterView.shouldDrawBackground = false;
         if (textToSet != null) {
@@ -7909,7 +7911,7 @@ public class ChatActivity extends BaseFragment implements
 
         chatActivityEnterView.setViewParentForEmoji(chatInputInAppContainer);
 
-        chatInputBubbleContainer.addView(chatActivityEnterView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.BOTTOM, 7, 0, 7, 0));
+        chatInputBubbleContainer.addView(chatActivityEnterView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.BOTTOM, chatInputViewsContainer.mdFlatBackground ? 0 : 7, 0, chatInputViewsContainer.mdFlatBackground ? 0 : 7, 0));
         contentView.addView(chatInputViewsContainer.getFadeView(), LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         contentView.addView(chatInputViewsContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
@@ -8233,7 +8235,7 @@ public class ChatActivity extends BaseFragment implements
         bottomOverlay.setFocusable(true);
         bottomOverlay.setFocusableInTouchMode(true);
         bottomOverlay.setClickable(true);
-        chatInputBubbleContainer.addView(bottomOverlay, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 44, Gravity.BOTTOM, 7, 0, 7, 0));
+        chatInputBubbleContainer.addView(bottomOverlay, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 44, Gravity.BOTTOM, chatInputViewsContainer.mdFlatBackground ? 0 : 7, 0, chatInputViewsContainer.mdFlatBackground ? 0 : 7, 0));
 
         bottomOverlayText = new TextView(context);
         bottomOverlayText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
@@ -10248,7 +10250,7 @@ public class ChatActivity extends BaseFragment implements
         searchCountText.setTextColor(getThemedColor(Theme.key_chat_searchPanelText));
         searchCountText.setGravity(Gravity.LEFT);
         searchContainer.addView(searchCountText, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, 30, Gravity.CENTER_VERTICAL, 0, -1, 97.33f, 0));
-        chatInputBubbleContainer.addView(searchContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, searchContainerHeight, Gravity.BOTTOM, 7, 0, 7, 0));
+        chatInputBubbleContainer.addView(searchContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, searchContainerHeight, Gravity.BOTTOM, chatInputViewsContainer.mdFlatBackground ? 0 : 7, 0, chatInputViewsContainer.mdFlatBackground ? 0 : 7, 0));
         if (hashtagHistoryView != null) {
             hashtagHistoryView.bringToFront();
         }

@@ -4,6 +4,7 @@ import static org.telegram.messenger.AndroidUtilities.dp;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -17,6 +18,7 @@ import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 
+import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.blur3.BlurredBackgroundWithFadeDrawable;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
@@ -34,6 +36,11 @@ public class ChatInputViewsContainer extends FrameLayout {
     private final View fadeView;
     private final FrameLayout inputIslandBubbleContainer;
     private final FrameLayout inAppKeyboardBubbleContainer;
+
+    // MDGram Etapa B2: barra de escribir plana estilo original (rectángulo opaco full-width,
+    // sin píldora/blur ni esquinas redondeadas, pegado al fondo). Lo activa ChatActivity.
+    public boolean mdFlatBackground;
+    private final Paint flatBgPaint = new Paint();
 
     public ChatInputViewsContainer(@NonNull Context context) {
         super(context);
@@ -181,7 +188,8 @@ public class ChatInputViewsContainer extends FrameLayout {
     }
 
     private void checkViewsPositions() {
-        inputIslandBubbleContainer.setTranslationY(-maxBottomInset - dp(INPUT_BUBBLE_BOTTOM));
+        // En modo plano (MDGram) el input queda pegado al fondo (sin el gap de 9dp de la píldora)
+        inputIslandBubbleContainer.setTranslationY(mdFlatBackground ? -maxBottomInset : -maxBottomInset - dp(INPUT_BUBBLE_BOTTOM));
         inAppKeyboardBubbleContainer.setTranslationY(inAppKeyboardBubbleContainer.getMeasuredHeight() - imeBottomInset);
     }
 
@@ -249,26 +257,37 @@ public class ChatInputViewsContainer extends FrameLayout {
 
     @Override
     protected void dispatchDraw(@NonNull Canvas canvas) {
-        underKeyboardBackgroundDrawable.setBounds(
-            0,
-            getMeasuredHeight() - (int) imeBottomInset,
-            getMeasuredWidth(),
-            Math.max(getMeasuredHeight(), getMeasuredHeight() - (int) imeBottomInset + dp(INPUT_KEYBOARD_RADIUS * 2))
-        );
+        if (mdFlatBackground) {
+            // MDGram Etapa B2: fondo plano del campo de escribir. Rectángulo opaco full-width con el
+            // color del panel, desde el tope del input hasta el borde inferior (cubre también el área
+            // de la barra de navegación), sin esquinas redondeadas ni blur.
+            if (inputBubbleHeightRound > 0) {
+                flatBgPaint.setColor(Theme.getColor(Theme.key_chat_messagePanelBackground));
+                final int barTop = getMeasuredHeight() - inputBubbleHeightRound - Math.round(maxBottomInset);
+                canvas.drawRect(0, barTop, getMeasuredWidth(), getMeasuredHeight(), flatBgPaint);
+            }
+        } else {
+            underKeyboardBackgroundDrawable.setBounds(
+                0,
+                getMeasuredHeight() - (int) imeBottomInset,
+                getMeasuredWidth(),
+                Math.max(getMeasuredHeight(), getMeasuredHeight() - (int) imeBottomInset + dp(INPUT_KEYBOARD_RADIUS * 2))
+            );
 
-        final int blurTop = getMeasuredHeight() - currentBlurredHeight;
+            final int blurTop = getMeasuredHeight() - currentBlurredHeight;
 
-        tmpRect.set(
-            Math.round(inputBubbleOffsetLeft), 0,
-            getMeasuredWidth() - Math.round(inputBubbleOffsetRight), inputBubbleHeightRound);
-        tmpRect.inset(0, -dp(7));
-        tmpRect.offset(0, blurTop + (int) bubbleInputTranlationY);
+            tmpRect.set(
+                Math.round(inputBubbleOffsetLeft), 0,
+                getMeasuredWidth() - Math.round(inputBubbleOffsetRight), inputBubbleHeightRound);
+            tmpRect.inset(0, -dp(7));
+            tmpRect.offset(0, blurTop + (int) bubbleInputTranlationY);
 
-        blurredBackgroundDrawable.setBounds(tmpRect);
-        blurredBackgroundDrawable.draw(canvas);
+            blurredBackgroundDrawable.setBounds(tmpRect);
+            blurredBackgroundDrawable.draw(canvas);
 
-        if (needDrawInAppKeyboard) {
-            underKeyboardBackgroundDrawable.draw(canvas);
+            if (needDrawInAppKeyboard) {
+                underKeyboardBackgroundDrawable.draw(canvas);
+            }
         }
 
         super.dispatchDraw(canvas);
