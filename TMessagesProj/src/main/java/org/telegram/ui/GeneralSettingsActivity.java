@@ -193,8 +193,12 @@ public class GeneralSettingsActivity extends BaseFragment {
             }
         });
         genGroup.addView(rounding);
-        // Preguntar antes de llamar (DIFERIDO — hook en el inicio de llamada)
-        addCheck(context, genGroup, "Preguntar antes de llamar", false, false, cell -> soon("Preguntar antes de llamar"));
+        // Preguntar antes de llamar (FUNCIONAL — hook en VoIPHelper.startCall)
+        addCheck(context, genGroup, "Preguntar antes de llamar", MDGramConfig.askBeforeCalling(), false, cell -> {
+            boolean c = !cell.isChecked();
+            cell.setChecked(c);
+            MDGramConfig.setAskBeforeCalling(c);
+        });
 
         // footer
         TextInfoPrivacyCell info = new TextInfoPrivacyCell(context);
@@ -219,7 +223,7 @@ public class GeneralSettingsActivity extends BaseFragment {
         header.addView(gradient, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
         previewDarken = new View(context);
-        previewDarken.setBackgroundColor(0x4D000000);
+        previewDarken.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0x22000000, 0x66000000}));
         header.addView(previewDarken, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
         LinearLayout headerText = new LinearLayout(context);

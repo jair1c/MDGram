@@ -24,6 +24,8 @@ google-services.json
 # MDGram: logs de build + notas internas de desarrollo — no van al repo público
 build_mdgram*.log
 *.log
+*.bat
+build_log.txt
 SESSION_NOTES.md
 
 # MDGram: tooling/scratchpads locales de desarrollo (scripts Python, clones dispersos)

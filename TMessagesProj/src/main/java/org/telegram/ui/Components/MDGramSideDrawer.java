@@ -105,7 +105,7 @@ public class MDGramSideDrawer extends FrameLayout {
 
         // overlay de oscurecido (opcional, controlado por General → "Foto de perfil oscurecida")
         darkenOverlay = new View(activity);
-        darkenOverlay.setBackgroundColor(0x4D000000);
+        darkenOverlay.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0x22000000, 0x66000000}));
         header.addView(darkenOverlay, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
         LinearLayout headerText = new LinearLayout(activity);

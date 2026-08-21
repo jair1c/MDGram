@@ -7616,7 +7616,8 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
             }
             editFieldTy += -dp(2) * (1f - progressToKeyboard);
             chatActivityEnterView.getEditField().setTranslationY(editFieldTy);
-            float radius = dp(50) / 2f;
+            boolean flatBar = chatActivityEnterView != null && chatActivityEnterView.flatBarLayout();
+            float radius = flatBar ? 0 : dp(50) / 2f;
             AndroidUtilities.lerp(sharedResources.rect2, sharedResources.rect1, progressToKeyboard, sharedResources.finalRect);
             if (inputFieldBackground != null) {
                 inputFieldBackground.setBounds((int) sharedResources.finalRect.left, (int) sharedResources.finalRect.top, (int) sharedResources.finalRect.right, (int) sharedResources.finalRect.bottom);
@@ -7624,7 +7625,11 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                 inputFieldBackground.setAlpha((int) (0xFF * (1f - progressToDismiss) * getHideInterfaceAlpha() * (1f - outT)));
                 inputFieldBackground.draw(canvas);
             } else {
-                canvas.drawRoundRect(sharedResources.finalRect, radius, radius, inputBackgroundPaint);
+                if (flatBar) {
+                    canvas.drawRect(sharedResources.finalRect, inputBackgroundPaint);
+                } else {
+                    canvas.drawRoundRect(sharedResources.finalRect, radius, radius, inputBackgroundPaint);
+                }
             }
             if (progressToKeyboard < 0.5f) {
                 canvas.save();
@@ -7634,7 +7639,8 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                 return rez;
             }
         } else if (chatActivityEnterView != null && chatActivityEnterView.isPopupView(child)) {
-            final float radius = dp(30);
+            boolean flatBar = chatActivityEnterView.flatBarLayout();
+            final float radius = flatBar ? 0 : dp(30);
             sharedResources.popupRect.set(
                 0,
                 child.getY() + dp(1),
@@ -7642,7 +7648,11 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                 getHeight() + dp(20)
             );
             clipPath.rewind();
-            clipPath.addRoundRect(sharedResources.popupRect, radius, radius, Path.Direction.CW);
+            if (flatBar) {
+                clipPath.addRect(sharedResources.popupRect, Path.Direction.CW);
+            } else {
+                clipPath.addRoundRect(sharedResources.popupRect, radius, radius, Path.Direction.CW);
+            }
             canvas.save();
             canvas.clipPath(clipPath);
 
@@ -7652,7 +7662,11 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                 emojiKeyboardBackground.setAlpha(0xFF);
                 emojiKeyboardBackground.draw(canvas);
             } else {
-                canvas.drawRoundRect(sharedResources.popupRect, radius, radius, inputBackgroundPaint);
+                if (flatBar) {
+                    canvas.drawRect(sharedResources.popupRect, inputBackgroundPaint);
+                } else {
+                    canvas.drawRoundRect(sharedResources.popupRect, radius, radius, inputBackgroundPaint);
+                }
             }
             boolean r = super.drawChild(canvas, child, drawingTime);
             canvas.restore();

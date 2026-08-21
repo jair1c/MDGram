@@ -333,4 +333,13 @@ public class MDGramConfig {
     public static void setHidePremiumScreens(boolean v) {
         prefs().edit().putBoolean("hide_premium_screens", v).apply();
     }
+
+    // ---- General → "Preguntar antes de llamar". Muestra un diálogo de confirmación antes de iniciar llamadas. Default OFF.
+    public static boolean askBeforeCalling() {
+        return prefs().getBoolean("ask_before_calling", false);
+    }
+
+    public static void setAskBeforeCalling(boolean v) {
+        prefs().edit().putBoolean("ask_before_calling", v).apply();
+    }
 }

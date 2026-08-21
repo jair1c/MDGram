@@ -67,6 +67,9 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
+import org.telegram.messenger.MDGramConfig;
+import org.telegram.messenger.UserObject;
+
 public class VoIPHelper {
 
 	public static long lastCallTime = 0;
@@ -74,6 +77,29 @@ public class VoIPHelper {
 	private static final int VOIP_SUPPORT_ID = 4244000;
 
 	public static void startCall(TLRPC.User user, boolean videoCall, boolean canVideoCall, final Activity activity, TLRPC.UserFull userFull, AccountInstance accountInstance) {
+		startCall(user, videoCall, canVideoCall, activity, userFull, accountInstance, true);
+	}
+
+	public static void startCall(TLRPC.User user, boolean videoCall, boolean canVideoCall, final Activity activity, TLRPC.UserFull userFull, AccountInstance accountInstance, boolean checkConfirm) {
+		if (activity == null) {
+			return;
+		}
+		if (checkConfirm && MDGramConfig.askBeforeCalling()) {
+			AlertDialog.Builder bldr = new AlertDialog.Builder(activity);
+			bldr.setTitle(LocaleController.getString(videoCall ? R.string.VideoCall : R.string.Call));
+			String name = user != null ? UserObject.getUserName(user) : "";
+			bldr.setMessage(String.format(Locale.getDefault(), videoCall ? "¿Deseas iniciar una videollamada con %s?" : "¿Deseas llamar a %s?", name));
+			bldr.setPositiveButton(LocaleController.getString(R.string.Call), (dialog, which) -> {
+				startCall(user, videoCall, canVideoCall, activity, userFull, accountInstance, false);
+			});
+			bldr.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+			try {
+				bldr.show();
+			} catch (Exception e) {
+				FileLog.e(e);
+			}
+			return;
+		}
 		if (accountInstance == null ? MessagesController.getInstance(UserConfig.selectedAccount).isFrozen() : accountInstance.getMessagesController().isFrozen()) {
 			AccountFrozenAlert.show(accountInstance == null ? UserConfig.selectedAccount : accountInstance.getCurrentAccount());
 			return;

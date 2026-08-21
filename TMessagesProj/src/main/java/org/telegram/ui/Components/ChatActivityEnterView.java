@@ -13582,7 +13582,7 @@ public class ChatActivityEnterView extends FrameLayout implements
     public boolean mdChatBar;
     // true cuando se usa el layout plano estilo MDGram (clip izq, stickers der, mic plano), sea en
     // historias (storiesReplyLayout) o en chats normales (mdChatBar). Los puntos de LAYOUT lo consultan.
-    private boolean flatBarLayout() {
+    public boolean flatBarLayout() {
         return storiesReplyLayout || mdChatBar;
     }
     public void applyStoriesReplyLayout() {
