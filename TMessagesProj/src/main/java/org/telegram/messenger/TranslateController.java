@@ -1090,10 +1090,13 @@ public class TranslateController extends BaseController {
                 }*/
 
                 final TLRPC.TL_messages_translateText req = new TLRPC.TL_messages_translateText();
-                if (isTranscription) {
+                if (isTranscription || MDGramTranslator.enabled()) {
                     req.flags |= 2;
-                    req.text.addAll(pendingTranslation1.messageTexts);
-                } else {
+                    if (pendingTranslation1.messageTexts != null) {
+                        req.text.addAll(pendingTranslation1.messageTexts);
+                    }
+                }
+                if (!isTranscription) {
                     req.flags |= 1;
                     req.peer = getMessagesController().getInputPeer(dialogId);
                     req.id = pendingTranslation1.messageIds;
@@ -1724,21 +1727,11 @@ public class TranslateController extends BaseController {
         if (!MDGramTranslator.enabled() || req.to_lang == null) {
             return getConnectionsManager().sendRequest(req, onComplete);
         }
-        final ArrayList<String> texts = new ArrayList<>();
-        for (int i = 0; i < req.text.size(); i++) {
-            TLRPC.TL_textWithEntities t = req.text.get(i);
-            texts.add(t != null && t.text != null ? t.text : "");
-        }
-        MDGramTranslator.translate(texts, req.to_lang, new MDGramTranslator.Result() {
+        MDGramTranslator.translateWithEntities(req.text, req.to_lang, new MDGramTranslator.ResultEntities() {
             @Override
-            public void done(ArrayList<String> translated) {
+            public void done(ArrayList<TLRPC.TL_textWithEntities> translated) {
                 TLRPC.TL_messages_translateResult res = new TLRPC.TL_messages_translateResult();
-                for (int i = 0; i < req.text.size(); i++) {
-                    TLRPC.TL_textWithEntities twe = new TLRPC.TL_textWithEntities();
-                    twe.text = i < translated.size() ? translated.get(i) : (req.text.get(i) != null ? req.text.get(i).text : "");
-                    twe.entities = new ArrayList<>();
-                    res.result.add(twe);
-                }
+                res.result.addAll(translated);
                 onComplete.run(res, null);
             }
             @Override

@@ -3005,21 +3005,15 @@ public class AndroidUtilities {
     }
 
     public static int getPhotoSize() {
-        // MDGram: "Enviar fotos en alta calidad" (Conversación) → sube el tope a 2560px. Default OFF (1280).
-        return getPhotoSize(MDGramConfig.largePhotos());
+        // MDGram: "Calidad de fotos al enviar" (Conversación) → 800..2560px. Default 1280.
+        return MDGramConfig.photoQualitySize();
     }
 
     public static int getPhotoSize(boolean highQuality) {
         if (highQuality) {
-            if (highQualityPhotoSize == null) {
-                highQualityPhotoSize = 2560;
-            }
-            return highQualityPhotoSize;
+            return Math.max(1920, MDGramConfig.photoQualitySize());
         } else {
-            if (photoSize == null) {
-                photoSize = 1280;
-            }
-            return photoSize;
+            return MDGramConfig.photoQualitySize();
         }
     }
 

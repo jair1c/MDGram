@@ -1,6 +1,6 @@
 {
-  "versionCode": 6,
-  "versionName": "V4.2",
-  "changelog": "Fuente de emoji personalizada (pack Google/Noto descargable) + selector de packs en Conversación → Emojis. Corrección: el botón de grabar (mic/cámara) ahora es visible en modo claro.",
+  "versionCode": 7,
+  "versionName": "V5",
+  "changelog": "Traductor de MDGram integrado (Google/Yandex sin límites y con preservación de formato). Nuevo selector fino de calidad de fotos al enviar (800px a 2560px). Opción para ocultar la barra de búsqueda en la pantalla principal. Mejoras de estabilidad y rendimiento.",
   "apkUrl": "https://mdgram-web.vercel.app/dl"
 }

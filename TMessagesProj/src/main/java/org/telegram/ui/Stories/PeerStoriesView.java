@@ -28,6 +28,7 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -6573,7 +6574,7 @@ public class PeerStoriesView extends SizeNotifierFrameLayout implements Notifica
                 }
             };
             titleView.setTextSize(14);
-            titleView.setTypeface(AndroidUtilities.bold());
+            titleView.setTypeface(Typeface.DEFAULT);
             titleView.setMaxLines(1);
             titleView.setEllipsizeByGradient(dp(4));
             titleView.setPivotX(0);

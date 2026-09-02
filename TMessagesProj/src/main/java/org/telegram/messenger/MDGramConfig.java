@@ -342,4 +342,34 @@ public class MDGramConfig {
     public static void setAskBeforeCalling(boolean v) {
         prefs().edit().putBoolean("ask_before_calling", v).apply();
     }
+
+    // ---- Pantalla principal → "Ocultar barra de búsqueda" (en la lista principal de chats). Default OFF.
+    public static boolean hideSearchBar() {
+        return prefs().getBoolean("hide_search_bar", false);
+    }
+
+    public static void setHideSearchBar(boolean v) {
+        prefs().edit().putBoolean("hide_search_bar", v).apply();
+    }
+
+    // ---- Conversación → "Calidad de fotos al enviar" (800..2560px). Default 1280px.
+    public static final int PHOTO_SIZE_800 = 800;
+    public static final int PHOTO_SIZE_1280 = 1280;
+    public static final int PHOTO_SIZE_1600 = 1600;
+    public static final int PHOTO_SIZE_1920 = 1920;
+    public static final int PHOTO_SIZE_2560 = 2560;
+
+    private static Integer photoQualitySizeCache;
+
+    public static int photoQualitySize() {
+        if (photoQualitySizeCache == null) {
+            photoQualitySizeCache = prefs().getInt("photo_quality_size", 1280);
+        }
+        return photoQualitySizeCache;
+    }
+
+    public static void setPhotoQualitySize(int v) {
+        photoQualitySizeCache = v;
+        prefs().edit().putInt("photo_quality_size", v).apply();
+    }
 }

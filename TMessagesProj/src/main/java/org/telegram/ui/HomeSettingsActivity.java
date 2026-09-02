@@ -56,7 +56,12 @@ public class HomeSettingsActivity extends BaseFragment {
             MDGramConfig.setHomeTitleAsName(c);
             toast("Reinicia la app para aplicar");
         });
-        addValue(context, g1, "Ocultar barra de búsqueda", null, false, () -> soon("Ocultar barra de búsqueda"));
+        addCheck(context, g1, "Ocultar barra de búsqueda", "En la lista principal de chats", MDGramConfig.hideSearchBar(), false, cell -> {
+            boolean c = !cell.isChecked();
+            cell.setChecked(c);
+            MDGramConfig.setHideSearchBar(c);
+            toast("Reinicia la app para aplicar");
+        });
 
         // ---- Carpeta (tabs de carpetas) — placeholders ----
         addHeader(context, content, "Carpeta");

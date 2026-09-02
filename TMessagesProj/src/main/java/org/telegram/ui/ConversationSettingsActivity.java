@@ -30,6 +30,7 @@ import org.telegram.ui.Components.SeekBarView;
 public class ConversationSettingsActivity extends BaseFragment {
 
     private TextSettingsCell stickerSizeCell;
+    private TextSettingsCell photoQualityCell;
     private TextSettingsCell actionBarStyleCell;
     private TextSettingsCell bubbleStyleCell;
     private View blurIntensityCell;
@@ -118,12 +119,11 @@ public class ConversationSettingsActivity extends BaseFragment {
         stickerSizeCell.setTextAndValue("Tamaño de sticker", stickerSizeName(MDGramConfig.stickerSizeLevel()), true);
         stickerSizeCell.setOnClickListener(v -> showStickerSizePicker());
         styleGroup.addView(stickerSizeCell);
-        // Enviar fotos en alta calidad (FUNCIONAL → AndroidUtilities.getPhotoSize)
-        addCheck(context, styleGroup, "Enviar fotos en alta calidad", "Sube el tope a 2560px al enviar", MDGramConfig.largePhotos(), true, cell -> {
-            boolean c = !cell.isChecked();
-            cell.setChecked(c);
-            MDGramConfig.setLargePhotos(c);
-        });
+        // Calidad de fotos (FUNCIONAL → 800..2560px en AndroidUtilities.getPhotoSize)
+        photoQualityCell = new TextSettingsCell(context);
+        photoQualityCell.setTextAndValue("Calidad de fotos", photoQualityName(MDGramConfig.photoQualitySize()), true);
+        photoQualityCell.setOnClickListener(v -> showPhotoQualityPicker());
+        styleGroup.addView(photoQualityCell);
         // Estilos de burbuja (FUNCIONAL → forma de la burbuja en Theme.MessageDrawable.generatePath)
         bubbleStyleCell = new TextSettingsCell(context);
         bubbleStyleCell.setTextAndValue("Estilos de burbuja", bubbleStyleName(MDGramConfig.bubbleStyle()), true);
@@ -260,6 +260,35 @@ public class ConversationSettingsActivity extends BaseFragment {
         b.setItems(new CharSequence[]{"Pequeño", "Normal", "Grande"}, (d, which) -> {
             MDGramConfig.setStickerSizeLevel(which);
             stickerSizeCell.setTextAndValue("Tamaño de sticker", stickerSizeName(which), true);
+        });
+        showDialog(b.create());
+    }
+
+    private String photoQualityName(int px) {
+        switch (px) {
+            case 800: return "800 px (Baja)";
+            case 1600: return "1600 px (Media)";
+            case 1920: return "1920 px (Full HD)";
+            case 2560: return "2560 px (Ultra HD)";
+            default: return "1280 px (Predeterminada)";
+        }
+    }
+
+    private void showPhotoQualityPicker() {
+        if (getParentActivity() == null) {
+            return;
+        }
+        final int[] sizes = {800, 1280, 1600, 1920, 2560};
+        CharSequence[] items = new CharSequence[sizes.length];
+        for (int i = 0; i < sizes.length; i++) {
+            items[i] = photoQualityName(sizes[i]);
+        }
+        AlertDialog.Builder b = new AlertDialog.Builder(getParentActivity());
+        b.setTitle("Calidad de fotos al enviar");
+        b.setItems(items, (d, which) -> {
+            int chosen = sizes[which];
+            MDGramConfig.setPhotoQualitySize(chosen);
+            photoQualityCell.setTextAndValue("Calidad de fotos", photoQualityName(chosen), true);
         });
         showDialog(b.create());
     }

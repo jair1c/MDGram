@@ -133,6 +133,7 @@ public class TranslateAlert2 extends BottomSheet implements NotificationCenter.N
         fixNavigationBar();
 
         this.reqText = text;
+        this.reqMessageEntities = entities;
         this.reqPeer = peer;
         this.reqMessageId = messageId;
         this.reqSum = sum;
@@ -334,6 +335,44 @@ public class TranslateAlert2 extends BottomSheet implements NotificationCenter.N
             return;
         }
 
+        if (org.telegram.messenger.MDGramTranslator.enabled()) {
+            ArrayList<TLRPC.TL_textWithEntities> list = new ArrayList<>();
+            list.add(textWithEntities);
+            org.telegram.messenger.MDGramTranslator.translateWithEntities(list, lang, new org.telegram.messenger.MDGramTranslator.ResultEntities() {
+                @Override
+                public void done(ArrayList<TLRPC.TL_textWithEntities> translatedList) {
+                    AndroidUtilities.runOnUIThread(() -> {
+                        reqId = null;
+                        if (translatedList != null && !translatedList.isEmpty() && translatedList.get(0) != null && translatedList.get(0).text != null) {
+                            firstTranslation = false;
+                            TLRPC.TL_textWithEntities text = translatedList.get(0);
+                            CharSequence translated = SpannableStringBuilder.valueOf(text.text);
+                            MessageObject.addEntitiesToText(translated, text.entities, false, true, false, false);
+                            MessageObject.addUrlsByPattern(false, translated, false, 0, 0, true);
+                            translated = preprocessText(translated);
+                            textView.setText(translated);
+                            adapter.updateMainView(textViewContainer);
+                        } else {
+                            if (firstTranslation) {
+                                dismiss();
+                                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.showBulletin, Bulletin.TYPE_ERROR, LocaleController.getString(R.string.TranslationFailedAlert2));
+                            } else {
+                                BulletinFactory.of((FrameLayout) containerView, resourcesProvider).createErrorBulletin(LocaleController.getString(R.string.TranslationFailedAlert2)).show();
+                                headerView.toLanguageTextView.setText(languageName(toLanguage = prevToLanguage));
+                                adapter.updateMainView(textViewContainer);
+                            }
+                        }
+                    });
+                }
+
+                @Override
+                public void error() {
+                    AndroidUtilities.runOnUIThread(() -> translateAlt());
+                }
+            });
+            return;
+        }
+
         TLRPC.TL_messages_translateText req = new TLRPC.TL_messages_translateText();
         if (reqPeer != null) {
             req.flags |= 1;
@@ -362,6 +401,7 @@ public class TranslateAlert2 extends BottomSheet implements NotificationCenter.N
                     TLRPC.TL_textWithEntities text = preprocess(textWithEntities, ((TLRPC.TL_messages_translateResult) res).result.get(0));
                     CharSequence translated = SpannableStringBuilder.valueOf(text.text);
                     MessageObject.addEntitiesToText(translated, text.entities, false, true, false, false);
+                    MessageObject.addUrlsByPattern(false, translated, false, 0, 0, true);
                     translated = preprocessText(translated);
                     textView.setText(translated);
                     adapter.updateMainView(textViewContainer);
@@ -386,6 +426,49 @@ public class TranslateAlert2 extends BottomSheet implements NotificationCenter.N
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.55 Safari/537.36"
     };
     private void translateAlt() {
+        if (org.telegram.messenger.MDGramTranslator.enabled()) {
+            String _toLng = toLanguage;
+            if (_toLng != null) {
+                _toLng = _toLng.split("_")[0];
+            }
+            if ("nb".equals(_toLng)) {
+                _toLng = "no";
+            }
+            final String toLng = _toLng;
+
+            TLRPC.TL_textWithEntities textWithEntities = new TLRPC.TL_textWithEntities();
+            textWithEntities.text = reqText == null ? "" : reqText.toString();
+            if (reqMessageEntities != null) {
+                textWithEntities.entities = reqMessageEntities;
+            }
+            ArrayList<TLRPC.TL_textWithEntities> list = new ArrayList<>();
+            list.add(textWithEntities);
+
+            org.telegram.messenger.MDGramTranslator.translateWithEntities(list, toLng, new org.telegram.messenger.MDGramTranslator.ResultEntities() {
+                @Override
+                public void done(ArrayList<TLRPC.TL_textWithEntities> translatedList) {
+                    AndroidUtilities.runOnUIThread(() -> {
+                        if (translatedList != null && !translatedList.isEmpty() && translatedList.get(0) != null) {
+                            firstTranslation = false;
+                            TLRPC.TL_textWithEntities text = translatedList.get(0);
+                            CharSequence translated = SpannableStringBuilder.valueOf(text.text != null ? text.text : "");
+                            MessageObject.addEntitiesToText(translated, text.entities, false, true, false, false);
+                            MessageObject.addUrlsByPattern(false, translated, false, 0, 0, true);
+                            translated = preprocessText(translated);
+                            textView.setText(translated);
+                            adapter.updateMainView(textViewContainer);
+                        }
+                    });
+                }
+
+                @Override
+                public void error() {
+                    // ignore
+                }
+            });
+            return;
+        }
+
         final String text = reqText == null ? "" : reqText.toString();
         String _fromLng = fromLanguage;
         if (_fromLng != null) {
