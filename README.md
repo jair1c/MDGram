@@ -11,6 +11,14 @@ Cliente de Telegram no oficial para Android — revival del proyecto **MDGram** 
 
 Instala el APK permitiendo "instalar apps de esta fuente".
 
+## Aviso para MDGram V5.1
+
+**V5.1 está en preparación y todavía no se ha publicado.** La última descarga disponible sigue siendo V5.
+
+A partir de V5.1, el identificador de paquete cambiará de `com.mdgram.messenger.web` a `com.mdgram.messenger`. Android lo tratará como una aplicación distinta: V5 y anteriores no se actualizarán automáticamente a V5.1 y podrán coexistir con ella. Cuando V5.1 esté disponible, instala su APK, inicia sesión de nuevo y comprueba que todo esté bien antes de eliminar la aplicación anterior. La sesión y los datos guardados solo en el dispositivo no se transfieren automáticamente.
+
+Este cambio se indicará también en las notas de la release V5.1.
+
 ## Licencia
 
 **GPL v2 o posterior**, heredada de Telegram / NekoX. Ver [LICENSE](LICENSE).
