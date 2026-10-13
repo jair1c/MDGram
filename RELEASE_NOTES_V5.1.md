@@ -1,4 +1,4 @@
-# MDGram V5.1 — notas preparadas para publicación
+# MDGram V5.1 — versión estable
 
 ## Cambio de paquete: instalación nueva necesaria
 
@@ -24,4 +24,6 @@ APK ARM de 32 y 64 bits, Android 7 o posterior. El número de base mostrado por 
 
 ## Publicación
 
-Publicar sólo el APK firmado final con estas notas, tras cerrar las comprobaciones de RELEASE_READINESS.md. Actualizar el anuncio del canal cuando exista el asset de V5.1; actualmente la release pública sigue en V5. No adjuntar capturas privadas, bases de datos, propiedades de firma ni diagnósticos.
+Disponible en https://github.com/jair1c/MDGram/releases/tag/V5.1 como versión estable, sin prerelease. APK firmado universal ARM32/ARM64, junto con SHA256SUMS.txt. Código correspondiente en codex/release-v5.1. La migración de paquete requiere instalar la aplicación nueva e iniciar sesión.
+
+Los assets MDGram-arm64.apk y MDGram-armv7a.apk son copias de compatibilidad del mismo APK universal, para los enlaces existentes de la web. No son variantes reducidas; contienen ambas arquitecturas y comparten el SHA-256 del universal.

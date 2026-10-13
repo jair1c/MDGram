@@ -449,3 +449,11 @@ APK final de este bloque: .test-artifacts/MDGram-whole-chat-control.apk. BUILD S
 - Autorización ampliada a Galaxy y otros chats. Canal público/traducción, comentarios vinculados, foro, historial de grupo, pestañas y recepción de notificación real comprobados sin enviar a terceros.
 - APK definitivo FF59E831… instalado verificado por hash; mismo PID13450 durante la pasada. Detalles y límites en RELEASE_VERIFICATION_2026-10-13.md.
 - Recomendación actual: V5.1 estable sin beta, con alcance explícito en RELEASE_READINESS.md. Sustituye la recomendación previa de candidata/beta; aún no publicada ni subida a GitHub.
+
+## 13-10-2026 — Publicación V5.1 estable
+
+- Release https://github.com/jair1c/MDGram/releases/tag/V5.1 publicada sin draft ni prerelease. APK MDGram-universal.apk, 57537694 bytes, y SHA256SUMS.txt.
+- Código de la versión: snapshot 2b19922018f829c8138d68d4070b0492cf4e055d en codex/release-v5.1 y tag V5.1. Snapshot sobre el historial de main porque el clon de Cherrygram era superficial; no hubo force-push. Conservadas licencias/créditos. Extra.kt público tiene marcadores APP_ID=0 y APP_HASH vacío; configuración privada conservada sólo local.
+- Descarga pública GitHub y descarga a través de /dl: SHA256 FF59E831CEAF5A84211B35182B0F2B5A788E88F654CD8EA0528E9DBFEE8DCB1A, idéntico al APK probado. apksigner verifica firma v2; paquete com.mdgram.messenger, code70389, base12.10.1, minSDK24, target36, ABI arm64-v8a/armeabi-v7a.
+- Manifest main/version.json y https://mdgram-web.vercel.app/api/latest confirmados V5.1/code8. README principal anuncia versión disponible y advierte instalación nueva/cambio de paquete. Fuente migrada disponible mediante su enlace; main conserva la base anterior.
+- Detectados enlaces /dl/arm64 y /dl/armv7a que esperan assets con esos nombres. Se publican copias idénticas del APK universal, etiquetadas y documentadas como compatibilidad web; no variantes reducidas. Conservan la firma y el APK exacto probado.

@@ -2,7 +2,7 @@
 
 ## Decisión
 
-V5.1 firmada supera la verificación de las áreas modificadas y la pasada física del APK definitivo. Se recomienda publicarla como versión estable, sin etiqueta beta, con el alcance y límites detallados abajo. No se publicó, hizo commit ni push en este bloque.
+V5.1 firmada supera la verificación de las áreas modificadas y la pasada física del APK definitivo. Se recomienda publicarla como versión estable, sin etiqueta beta, con el alcance y límites detallados abajo. Publicada en GitHub como V5.1 estable; ver la comprobación de publicación al final.
 
 APK final: [.test-artifacts/MDGram-release-stability.apk](.test-artifacts/MDGram-release-stability.apk). Compilado en 4m44s, firma verificada e instalado en Galaxy A36 y MEmu conservando sesión. SHA-256 `FF59E831CEAF5A84211B35182B0F2B5A788E88F654CD8EA0528E9DBFEE8DCB1A`.
 
@@ -26,7 +26,7 @@ APK final: [.test-artifacts/MDGram-release-stability.apk](.test-artifacts/MDGram
 - [ ] Formato/medios especiales restantes y recorridos con cuenta Premium. La traducción completa propia omite artículos, encuestas, resúmenes y transcripciones; Telegram conserva sus requisitos nativos.
 - [x] Pasada adicional del APK definitivo en Galaxy A36: hash instalado idéntico, navegación fuera de Saved, 14 pulsaciones de tema y seis retornos desde segundo plano conservando PID13450. 17,7 minutos de pasada, crash buffer filtrado vacío y claro/oscuro confirmados por captura. Resultado final y duración en RELEASE_VERIFICATION_2026-10-13.md.
 - [ ] Fallo histórico de MEmu: SurfaceFlinger aborta al capturar por error de reserva de buffer. Registro conservado; causa no atribuida a MDGram y no declarada resuelta. APK ARM32/ARM64, no x86 nativo.
-- [ ] Publicar código correspondiente, asset firmado y RELEASE_NOTES_V5.1.md en GitHub; comprobar desde fuera el asset, paquete/firma y respuesta del canal después de publicar. La release viva sigue V5/code7, coherente con /api/latest. No anunciar V5.1 antes de subir su APK.
+- [x] Código correspondiente publicado en codex/release-v5.1 y tag V5.1. Release pública sin draft/prerelease. APK descargado desde GitHub y /dl con hash idéntico; firma v2 verificada, paquete com.mdgram.messenger/code70389. main/version.json y /api/latest responden V5.1/code8.
 
 ## Versión y actualizaciones
 

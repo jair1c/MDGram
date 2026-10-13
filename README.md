@@ -1,4 +1,6 @@
-## Telegram messenger for Android
+# MDGram V5.1
+
+Cliente no oficial de Telegram para Android, basado en Telegram 12.10.1 y Cherrygram. [Release estable V5.1](https://github.com/jair1c/MDGram/releases/tag/V5.1), APK universal ARM32/ARM64 para Android 7 o posterior. La versión cambia el paquete a com.mdgram.messenger y requiere iniciar sesión en la nueva aplicación.
 
 La descripción, el estado técnico, las instrucciones de compilación y los pendientes específicos de MDGram están en [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
