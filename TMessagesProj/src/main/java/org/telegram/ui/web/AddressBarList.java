@@ -74,6 +74,8 @@ import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.Collections;
 
+import uz.unnarsx.cherrygram.chats.helpers.ChatsHelper2;
+
 public class AddressBarList extends FrameLayout {
 
     public static final int MAX_RECENTS = 20;
@@ -163,6 +165,7 @@ public class AddressBarList extends FrameLayout {
 
         setColors(Theme.getColor(Theme.key_iv_background), AndroidUtilities.computePerceivedBrightness(Theme.getColor(Theme.key_iv_background)) >= .721f ? Color.BLACK : Color.WHITE);
         setOpenProgress(0f);
+        setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
     }
 
     private void clearRecentSearches(View view) {
@@ -288,6 +291,12 @@ public class AddressBarList extends FrameLayout {
 //                child.setAlpha(alpha);
 //                child.setTranslationY(-dp(Math.min(48, 8 + 6 * i)) * (1 - alpha));
 //            }
+            int desired = progress <= 0.0001f
+                ? IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                : IMPORTANT_FOR_ACCESSIBILITY_AUTO;
+            if (getImportantForAccessibility() != desired) {
+                setImportantForAccessibility(desired);
+            }
             invalidate();
         }
     }
@@ -1117,7 +1126,7 @@ public class AddressBarList extends FrameLayout {
             for (int i = 0; i < links.size(); ++i) {
                 min_id = Math.min(min_id, links.get(i).getId());
             }
-            MediaDataController.getInstance(currentAccount).loadMedia(selfId, links.isEmpty() ? 30 : 50, min_id == Integer.MAX_VALUE ? 0 : min_id, 0, MediaDataController.MEDIA_URL, 0, 1, guid, 0, null, query);
+            MediaDataController.getInstance(currentAccount).loadMedia(ChatsHelper2.INSTANCE.getCustomChatID(), links.isEmpty() ? 30 : 50, min_id == Integer.MAX_VALUE ? 0 : min_id, 0, MediaDataController.MEDIA_URL, 0, 1, guid, 0, null, query);
         }
 
         @Override

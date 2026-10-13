@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "V5",
-  "changelog": "Traductor de MDGram integrado (Google/Yandex sin limites y con preservacion de formato). Nuevo selector fino de calidad de fotos al enviar (800px a 2560px). Opcion para ocultar la barra de busqueda en la pantalla principal. Mejoras de estabilidad y rendimiento.",
+  "versionCode": 8,
+  "versionName": "V5.1",
+  "changelog": "MDGram V5.1: nuevo paquete com.mdgram.messenger, navegación clásica/nueva, barra plana corregida, traducción Google/Yandex sin Premium, selección ventana/mensaje, política automática, cancelación y caché por proveedor. Spoilers y guardado de bloques de código corregidos. Consulta las notas para límites y migración.",
   "apkUrl": "https://mdgram-web.vercel.app/dl"
 }

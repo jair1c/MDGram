@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.Locale;
 
 import org.telegram.tgnet.TLRPC;
@@ -22,6 +22,17 @@ import org.telegram.tgnet.TLRPC;
 // Portado en concepto del traductor de OwlGram/OctoGram (GPL, atribución en los créditos).
 // Ahora con preservación de formato (negritas, cursivas, enlaces, código, tachado, spoilers).
 public class MDGramTranslator {
+    private static final ThreadLocal<MDGramTranslationRequest> activeRequest = new ThreadLocal<>();
+
+    private static void attachRequest(HttpURLConnection connection) {
+        MDGramTranslationRequest request = activeRequest.get();
+        if (request != null) request.attach(connection);
+    }
+
+    private static void detachRequest(HttpURLConnection connection) {
+        MDGramTranslationRequest request = activeRequest.get();
+        if (request != null) request.detach(connection);
+    }
 
     // proveedor activo, persistido. true = Google (motor propio); false = Telegram nativo.
     // Se elige en la pantalla "Traducir" del hub. Default: Google.
@@ -37,8 +48,21 @@ public class MDGramTranslator {
         return prefs().getInt("translator_provider", PROVIDER_GOOGLE);
     }
 
+    public static boolean inlineMode() { return prefs().getBoolean("translator_inline", false); }
+    public static void setInlineMode(boolean value) { prefs().edit().putBoolean("translator_inline", value).apply(); }
+    public static boolean autoChats() { return prefs().getBoolean("translator_auto_chats", false); }
+    public static void setAutoChats(boolean value) { prefs().edit().putBoolean("translator_auto_chats", value).apply(); }
+
     public static void setProvider(int provider) {
         prefs().edit().putInt("translator_provider", provider).apply();
+    }
+
+    public static boolean keepFormatting() {
+        return prefs().getBoolean("translator_keep_formatting", true);
+    }
+
+    public static void setKeepFormatting(boolean enabled) {
+        prefs().edit().putBoolean("translator_keep_formatting", enabled).apply();
     }
 
     // ¿usar nuestro motor (Google/Yandex)? Si es Telegram, mdSendTranslate delega a la API nativa.
@@ -58,11 +82,20 @@ public class MDGramTranslator {
 
     // Traduce con preservación completa de entidades (negritas, links, etc.)
     public static void translateWithEntities(ArrayList<TLRPC.TL_textWithEntities> items, String toLang, ResultEntities cb) {
+        translateWithEntitiesCancelable(items, toLang, cb);
+    }
+
+    public static MDGramTranslationRequest translateWithEntitiesCancelable(ArrayList<TLRPC.TL_textWithEntities> items, String toLang, ResultEntities cb) {
+        final MDGramTranslationRequest request = new MDGramTranslationRequest();
+        final int provider = getProvider();
+        final boolean preserveFormatting = keepFormatting();
         Utilities.globalQueue.postRunnable(() -> {
+            activeRequest.set(request);
             try {
-                int provider = getProvider();
+                request.check();
                 ArrayList<TLRPC.TL_textWithEntities> out = new ArrayList<>();
                 for (TLRPC.TL_textWithEntities item : items) {
+                    request.check();
                     if (item == null || item.text == null || item.text.length() == 0) {
                         TLRPC.TL_textWithEntities empty = new TLRPC.TL_textWithEntities();
                         empty.text = item != null && item.text != null ? item.text : "";
@@ -70,21 +103,33 @@ public class MDGramTranslator {
                         out.add(empty);
                         continue;
                     }
-                    String html = textToHtml(item);
+                    String html = preserveFormatting ? textToHtml(item) : item.text;
                     String translatedHtml;
                     if (provider == PROVIDER_YANDEX) {
-                        translatedHtml = yandexTranslate(html, toLang);
+                        translatedHtml = yandexTranslate(html, toLang, preserveFormatting);
                     } else {
-                        translatedHtml = googleTranslate(html, toLang);
+                        translatedHtml = googleTranslate(html, toLang, preserveFormatting);
                     }
-                    out.add(htmlToText(translatedHtml));
+                    if (preserveFormatting) {
+                        out.add(htmlToText(translatedHtml));
+                    } else {
+                        TLRPC.TL_textWithEntities plain = new TLRPC.TL_textWithEntities();
+                        plain.text = translatedHtml;
+                        plain.entities = new ArrayList<>();
+                        out.add(plain);
+                    }
                 }
-                cb.done(out);
+                if (!request.isCancelled()) cb.done(out);
             } catch (Exception e) {
-                FileLog.e(e);
-                cb.error();
+                if (!request.isCancelled()) {
+                    FileLog.e(e);
+                    cb.error();
+                }
+            } finally {
+                activeRequest.remove();
             }
         });
+        return request;
     }
 
     // traduce una lista de textos al idioma destino, en orden. Todo en un hilo de fondo.
@@ -112,44 +157,120 @@ public class MDGramTranslator {
 
     public static String textToHtml(TLRPC.TL_textWithEntities twe) {
         if (twe == null || twe.text == null) return "";
-        if (twe.entities == null || twe.entities.isEmpty()) return twe.text;
-
-        ArrayList<TLRPC.MessageEntity> sorted = new ArrayList<>(twe.entities);
-        Collections.sort(sorted, (a, b) -> Integer.compare(b.offset, a.offset));
-
-        StringBuilder sb = new StringBuilder(twe.text);
-        for (TLRPC.MessageEntity e : sorted) {
-            if (e.offset < 0 || e.offset + e.length > sb.length()) continue;
-            int start = e.offset;
-            int end = e.offset + e.length;
-            String openTag = null;
-            String closeTag = null;
-            if (e instanceof TLRPC.TL_messageEntityBold) {
-                openTag = "<b>"; closeTag = "</b>";
-            } else if (e instanceof TLRPC.TL_messageEntityItalic) {
-                openTag = "<i>"; closeTag = "</i>";
-            } else if (e instanceof TLRPC.TL_messageEntityUnderline) {
-                openTag = "<u>"; closeTag = "</u>";
-            } else if (e instanceof TLRPC.TL_messageEntityStrike) {
-                openTag = "<s>"; closeTag = "</s>";
-            } else if (e instanceof TLRPC.TL_messageEntityCode) {
-                openTag = "<code>"; closeTag = "</code>";
-            } else if (e instanceof TLRPC.TL_messageEntityPre) {
-                openTag = "<pre>"; closeTag = "</pre>";
-            } else if (e instanceof TLRPC.TL_messageEntitySpoiler) {
-                openTag = "<span class=\"tg-spoiler\">"; closeTag = "</span>";
-            } else if (e instanceof TLRPC.TL_messageEntityTextUrl) {
-                openTag = "<a href=\"" + ((TLRPC.TL_messageEntityTextUrl) e).url + "\">"; closeTag = "</a>";
-            } else if (e instanceof TLRPC.TL_messageEntityUrl) {
-                String u = sb.substring(start, end);
-                openTag = "<a href=\"" + u + "\">"; closeTag = "</a>";
-            }
-            if (openTag != null && closeTag != null) {
-                sb.insert(end, closeTag);
-                sb.insert(start, openTag);
+        ArrayList<HtmlEntityTag> tags = new ArrayList<>();
+        if (twe.entities != null) {
+            for (TLRPC.MessageEntity entity : twe.entities) {
+                HtmlEntityTag tag = createHtmlTag(entity, twe.text);
+                if (tag != null) {
+                    tags.add(tag);
+                }
             }
         }
-        return sb.toString();
+        tags.sort(Comparator.comparingInt((HtmlEntityTag tag) -> tag.start)
+                .thenComparing((a, b) -> Integer.compare(b.end, a.end)));
+
+        StringBuilder html = new StringBuilder(twe.text.length() + tags.size() * 8);
+        ArrayList<HtmlEntityTag> active = new ArrayList<>();
+        for (int offset = 0; offset <= twe.text.length(); offset++) {
+            int firstEnding = -1;
+            for (int i = 0; i < active.size(); i++) {
+                if (active.get(i).end == offset) {
+                    firstEnding = i;
+                    break;
+                }
+            }
+            if (firstEnding >= 0) {
+                ArrayList<HtmlEntityTag> closed = new ArrayList<>();
+                for (int i = active.size() - 1; i >= firstEnding; i--) {
+                    HtmlEntityTag tag = active.remove(i);
+                    html.append(tag.close);
+                    closed.add(tag);
+                }
+                for (int i = closed.size() - 1; i >= 0; i--) {
+                    HtmlEntityTag tag = closed.get(i);
+                    if (tag.end != offset) {
+                        html.append(tag.open);
+                        active.add(tag);
+                    }
+                }
+            }
+            for (HtmlEntityTag tag : tags) {
+                if (tag.start == offset) {
+                    html.append(tag.open);
+                    active.add(tag);
+                } else if (tag.start > offset) {
+                    break;
+                }
+            }
+            if (offset < twe.text.length()) {
+                appendEscapedHtmlChar(html, twe.text.charAt(offset));
+            }
+        }
+        return html.toString();
+    }
+
+    private static class HtmlEntityTag {
+        int start;
+        int end;
+        String open;
+        String close;
+    }
+
+    private static HtmlEntityTag createHtmlTag(TLRPC.MessageEntity entity, String text) {
+        if (entity == null || entity.offset < 0 || entity.length <= 0 || entity.offset + entity.length > text.length()) {
+            return null;
+        }
+        String open;
+        String close;
+        if (entity instanceof TLRPC.TL_messageEntityBold) {
+            open = "<b>"; close = "</b>";
+        } else if (entity instanceof TLRPC.TL_messageEntityItalic) {
+            open = "<i>"; close = "</i>";
+        } else if (entity instanceof TLRPC.TL_messageEntityUnderline) {
+            open = "<u>"; close = "</u>";
+        } else if (entity instanceof TLRPC.TL_messageEntityStrike) {
+            open = "<s>"; close = "</s>";
+        } else if (entity instanceof TLRPC.TL_messageEntityCode) {
+            open = "<code>"; close = "</code>";
+        } else if (entity instanceof TLRPC.TL_messageEntityPre) {
+            open = "<pre>"; close = "</pre>";
+        } else if (entity instanceof TLRPC.TL_messageEntitySpoiler) {
+            open = "<span class=\"tg-spoiler\">"; close = "</span>";
+        } else if (entity instanceof TLRPC.TL_messageEntityTextUrl) {
+            String url = ((TLRPC.TL_messageEntityTextUrl) entity).url;
+            open = "<a href=\"" + escapeHtmlAttribute(url) + "\">"; close = "</a>";
+        } else if (entity instanceof TLRPC.TL_messageEntityUrl) {
+            String url = text.substring(entity.offset, entity.offset + entity.length);
+            open = "<a href=\"" + escapeHtmlAttribute(url) + "\">"; close = "</a>";
+        } else {
+            return null;
+        }
+        HtmlEntityTag tag = new HtmlEntityTag();
+        tag.start = entity.offset;
+        tag.end = entity.offset + entity.length;
+        tag.open = open;
+        tag.close = close;
+        return tag;
+    }
+
+    private static String escapeHtmlAttribute(String value) {
+        if (value == null) return "";
+        return value.replace("&", "&amp;").replace("\"", "&quot;")
+                .replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    private static String decodeHtmlEntities(String value) {
+        return value.replace("&quot;", "\"").replace("&#39;", "'")
+                .replace("&apos;", "'").replace("&lt;", "<")
+                .replace("&gt;", ">").replace("&amp;", "&");
+    }
+
+    private static void appendEscapedHtmlChar(StringBuilder out, char value) {
+        if (value == '&') out.append("&amp;");
+        else if (value == '<') out.append("&lt;");
+        else if (value == '>') out.append("&gt;");
+        else if (value == '\"') out.append("&quot;");
+        else out.append(value);
     }
 
     public static TLRPC.TL_textWithEntities htmlToText(String html) {
@@ -199,6 +320,7 @@ public class MDGramTranslator {
                                         entity = new TLRPC.TL_messageEntityCode();
                                     } else if ("pre".equals(tagName)) {
                                         entity = new TLRPC.TL_messageEntityPre();
+                                        entity.language = "";
                                     } else if ("span".equals(tagName) && "tg-spoiler".equals(t.url)) {
                                         entity = new TLRPC.TL_messageEntitySpoiler();
                                     } else if ("a".equals(tagName) && t.url != null) {
@@ -227,7 +349,7 @@ public class MDGramTranslator {
                                 if (qStart != -1) {
                                     int qEnd = tagContent.indexOf(tagContent.charAt(qStart), qStart + 1);
                                     if (qEnd != -1) {
-                                        t.url = tagContent.substring(qStart + 1, qEnd);
+                                        t.url = decodeHtmlEntities(tagContent.substring(qStart + 1, qEnd));
                                     }
                                 }
                             }
@@ -267,6 +389,10 @@ public class MDGramTranslator {
     }
 
     private static String googleTranslate(String text, String toLang) throws Exception {
+        return googleTranslate(text, toLang, false);
+    }
+
+    private static String googleTranslate(String text, String toLang, boolean html) throws Exception {
         String tl = toLang != null ? toLang.split("_")[0] : "en";
         if ("nb".equals(tl)) tl = "no";
         String[] clients = new String[]{"dict-chrome-ex", "tw-ob"};
@@ -275,6 +401,7 @@ public class MDGramTranslator {
         for (String client : clients) {
             String url = "https://translate.googleapis.com/translate_a/single?client=" + client + "&sl=auto&tl="
                     + URLEncoder.encode(tl, "UTF-8")
+                    // This endpoint strips formatting tags when format=html is supplied.
                     + "&dt=t&q="
                     + URLEncoder.encode(text, "UTF-8");
 
@@ -285,6 +412,7 @@ public class MDGramTranslator {
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
             try {
+                attachRequest(conn);
                 StringBuilder response = new StringBuilder();
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
                     String line;
@@ -309,8 +437,11 @@ public class MDGramTranslator {
                     return result;
                 }
             } catch (Exception e) {
+                MDGramTranslationRequest request = activeRequest.get();
+                if (request != null) request.check();
                 lastException = e;
             } finally {
+                detachRequest(conn);
                 conn.disconnect();
             }
         }
@@ -322,9 +453,15 @@ public class MDGramTranslator {
     }
 
     private static String yandexTranslate(String text, String toLang) throws Exception {
+        return yandexTranslate(text, toLang, false);
+    }
+
+    private static String yandexTranslate(String text, String toLang, boolean html) throws Exception {
         String uuid = java.util.UUID.randomUUID().toString().replace("-", "");
         String url = "https://translate.yandex.net/api/v1/tr.json/translate?id=" + uuid + "-0-0&srv=android";
-        String body = "lang=" + URLEncoder.encode(toLang == null ? "en" : toLang, "UTF-8") + "&text=" + URLEncoder.encode(text, "UTF-8");
+        String body = "lang=" + URLEncoder.encode(toLang == null ? "en" : toLang, "UTF-8")
+                + (html ? "&format=html" : "")
+                + "&text=" + URLEncoder.encode(text, "UTF-8");
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
@@ -333,6 +470,7 @@ public class MDGramTranslator {
         conn.setRequestProperty("User-Agent", "ru.yandex.translate/3.20.2024");
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
         try {
+            attachRequest(conn);
             conn.getOutputStream().write(body.getBytes("UTF-8"));
             StringBuilder response = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
@@ -353,6 +491,7 @@ public class MDGramTranslator {
             String result = sb.toString();
             return result.length() > 0 ? result : text;
         } finally {
+            detachRequest(conn);
             conn.disconnect();
         }
     }

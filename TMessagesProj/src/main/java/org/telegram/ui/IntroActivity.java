@@ -34,9 +34,6 @@ import android.opengl.GLES20;
 import android.opengl.GLUtils;
 import android.os.Looper;
 import android.os.Parcelable;
-import android.text.SpannableStringBuilder;
-import android.text.Spanned;
-import android.text.style.ImageSpan;
 import android.util.TypedValue;
 import android.view.Display;
 import android.view.Gravity;
@@ -91,6 +88,8 @@ import javax.microedition.khronos.egl.EGLDisplay;
 import javax.microedition.khronos.egl.EGLSurface;
 import javax.microedition.khronos.opengles.GL10;
 
+import uz.unnarsx.cherrygram.core.helpers.CGResourcesHelper;
+
 public class IntroActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
     private final static int ICON_WIDTH_DP = 200, ICON_HEIGHT_DP = 150;
 
@@ -112,7 +111,6 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
     private int lastPage = 0;
     private boolean justCreated = false;
     private boolean startPressed = false;
-    private Drawable logoDrawable;
     private CharSequence[] titles;
     private String[] messages;
     private int currentViewPagerPage;
@@ -153,7 +151,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
 
     @Override
     public View createView(Context context) {
-        titles[0] = "MDGram";
+        titles[0] = LocaleController.getString(R.string.CG_AppName);
 
 
         actionBar.setAddToContainer(false);
@@ -199,7 +197,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
         };
         scrollView.addView(frameContainerView, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP));
 
-        darkThemeDrawable = new RLottieDrawable(R.raw.sun, String.valueOf(R.raw.sun), dp(28), dp(28), true, null);
+        darkThemeDrawable = new RLottieDrawable(R.raw.sun_outline, String.valueOf(R.raw.sun_outline), dp(28), dp(28), true, null);
         darkThemeDrawable.setPlayInDirectionOfCustomEndFrame(true);
         darkThemeDrawable.beginApplyLayerColors();
         darkThemeDrawable.commitApplyLayerColors();
@@ -339,7 +337,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
             protected void onSizeChanged(int w, int h, int oldw, int oldh) {
                 super.onSizeChanged(w, h, oldw, oldh);
                 startMessagingButtonBackground.setBounds(0, 0, w, h);
-                startMessagingButtonBackground.setCornerRadius(dp(6));
+                startMessagingButtonBackground.setCornerRadius(Math.min(w, h) / 2f);
                 cellFlickerDrawable.setParentWidth(w);
             }
 
@@ -448,24 +446,13 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
             }
             justCreated = false;
         }
-        if (!AndroidUtilities.isTablet()) {
-            Activity activity = getParentActivity();
-            if (activity != null) {
-                activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-            }
-        }
+        AndroidUtilities.lockOrientation(getParentActivity(), ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
     }
 
     @Override
     public void onPause() {
         super.onPause();
-
-        if (!AndroidUtilities.isTablet()) {
-            Activity activity = getParentActivity();
-            if (activity != null) {
-                activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
-            }
-        }
+        AndroidUtilities.unlockOrientation(getParentActivity());
     }
 
     @Override
@@ -600,7 +587,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
             headerTextView.setGravity(Gravity.CENTER);
             frameLayout.addView(headerTextView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT, 18, 244, 18, 0));
 
-            messageTextView.setTextColor(0xFF737783);
+            messageTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             messageTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
             messageTextView.setLineSpacing(dpf2(2.33f), 1f);
             messageTextView.setGravity(Gravity.CENTER);
@@ -775,7 +762,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
                 return false;
             }
 
-            GLES20.glGenTextures(23, textures, 0);
+            GLES20.glGenTextures(textures.length, textures, 0);
             loadTexture(R.drawable.intro_fast_arrow_shadow, 0);
             loadTexture(R.drawable.intro_fast_arrow, 1);
             loadTexture(R.drawable.intro_fast_body, 2);
@@ -797,22 +784,14 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
             loadTexture(R.drawable.intro_powerful_star, 18);
             loadTexture(R.drawable.intro_private_door, 19);
             loadTexture(R.drawable.intro_private_screw, 20);
-            loadTexture(R.drawable.intro_tg_plane, 21);
+            loadTexture(R.drawable.mdgram_intro_logo, 21);
             loadTexture(v -> {
+                Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                paint.setColor(ThemeColors.MDGRAM_COLOR);
                 int size = dp(ICON_HEIGHT_DP);
                 Bitmap bm = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
                 Canvas c = new Canvas(bm);
-                float cx = size / 2f, cy = size / 2f, r = size / 2f;
-                Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                // MDGram welcome icon: concentric ring frame (outer ring, white gap, gray ring, white interior)
-                paint.setColor(0xFF203347);
-                c.drawCircle(cx, cy, r, paint);
-                paint.setColor(0xFFFFFFFF);
-                c.drawCircle(cx, cy, r * 0.91f, paint);
-                paint.setColor(0xFFEAEAEA);
-                c.drawCircle(cx, cy, r * 0.80f, paint);
-                paint.setColor(0xFFFFFFFF);
-                c.drawCircle(cx, cy, r * 0.745f, paint);
+                c.drawCircle(size / 2f, size / 2f, size / 2f, paint);
                 return bm;
             }, 22);
             loadTexture(telegramMaskProvider, 23);
@@ -976,14 +955,11 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
     }
 
     private void updateColors(boolean fromTheme) {
-        startMessagingButtonBackground.setColors(new int[]{getThemedColor(Theme.key_featuredStickers_addButton), getThemedColor(Theme.key_featuredStickers_addButton2)});
-        if (logoDrawable != null) {
-            logoDrawable.setColorFilter(Theme.multAlpha(getThemedColor(Theme.key_actionBarDefaultTitle), 0.9f), PorterDuff.Mode.MULTIPLY);
-        }
+        startMessagingButtonBackground.setColors(new int[]{getThemedColor(Theme.key_cgGradient2), getThemedColor(Theme.key_cgGradient1)});
         fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
         switchLanguageTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText4));
         startMessagingButton.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
-        startMessagingButton.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(6), Color.TRANSPARENT, Theme.getColor(Theme.key_featuredStickers_addButtonPressed)));
+        startMessagingButton.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(24), Color.TRANSPARENT, Theme.getColor(Theme.key_featuredStickers_addButtonPressed)));
         darkThemeDrawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_featuredStickers_addButton), PorterDuff.Mode.SRC_IN));
         bottomPages.invalidate();
         if (fromTheme) {
@@ -1003,7 +979,7 @@ public class IntroActivity extends BaseFragment implements NotificationCenter.No
                 TextView headerTextView = ch.findViewWithTag(pagerHeaderTag);
                 headerTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
                 TextView messageTextView = ch.findViewWithTag(pagerMessageTag);
-                messageTextView.setTextColor(0xFF737783);
+                messageTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
             }
         } else Intro.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
     }

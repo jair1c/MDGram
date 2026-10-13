@@ -110,6 +110,11 @@ public class ApplicationLoaderImpl extends ApplicationLoader {
 
     @Override
     public IUpdateLayout takeUpdateLayout(Activity activity, ViewGroup sideMenuContainer) {
+        // Telegram's server-provided APK is not an update for MDGram's package/signature.
+        // MDGram uses its own GitHub Releases updater through MDGramUpdater.
+        if ("com.mdgram.messenger".equals(activity.getPackageName())) {
+            return null;
+        }
         return new UpdateLayout(activity, sideMenuContainer);
     }
 

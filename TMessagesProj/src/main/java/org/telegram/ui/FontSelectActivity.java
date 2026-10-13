@@ -18,6 +18,7 @@ public class FontSelectActivity extends UniversalFragment {
     private static final LinkedHashMap<String, String> FONTS = new LinkedHashMap<>();
     static {
         FONTS.put("Predeterminada", null);
+        FONTS.put("Linotte", "LinotteFon-Bold.ttf");
         FONTS.put("Google Sans", "GoogleSans-Bold.ttf");
         FONTS.put("Samsung One UI", "SamsungOneUI-Bold.ttf");
         FONTS.put("Expletus Sans", "ExpletusSans-Bold.ttf");

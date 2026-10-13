@@ -8,6 +8,7 @@ import android.content.Context;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.Drawable;
+import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -31,6 +32,8 @@ import org.telegram.ui.Components.chat.buttons.ChatActivityBlurredRoundButton;
 import me.vkryl.android.AnimatorUtils;
 import me.vkryl.android.animator.BoolAnimator;
 import me.vkryl.android.animator.FactorAnimator;
+import uz.unnarsx.cherrygram.core.configs.CherrygramMessagesConfig;
+import uz.unnarsx.cherrygram.core.helpers.CGResourcesHelper;
 
 @SuppressLint("ViewConstructor")
 public class ChatActivityActionsButtonsLayout extends LinearLayout {
@@ -58,8 +61,11 @@ public class ChatActivityActionsButtonsLayout extends LinearLayout {
         forwardButton.button.setOnClickListener(v -> {});
         ScaleStateListAnimator.apply(forwardButton.button, .065f, 2f);
 
-        addTextView(replyButton, LocaleController.getString(R.string.Reply), R.drawable.input_reply, false);
-        addTextView(forwardButton, LocaleController.getString(R.string.Forward), R.drawable.input_forward, true);
+        int replyButtonIcon = CGResourcesHelper.INSTANCE.getLeftButtonDrawable(noForwards);
+        String replyButtonText = CGResourcesHelper.INSTANCE.getLeftButtonText(noForwards);
+
+        addTextView(replyButton, replyButtonText, replyButtonIcon, CherrygramMessagesConfig.INSTANCE.getLeftBottomButton() != CherrygramMessagesConfig.LEFT_BUTTON_REPLY);
+        addTextView(forwardButton, LocaleController.getString(R.string.Forward), R.drawable.input_forward, CherrygramMessagesConfig.INSTANCE.getLeftBottomButton() == CherrygramMessagesConfig.LEFT_BUTTON_REPLY);
 
         setOrientation(HORIZONTAL);
         setClipChildren(false);
@@ -89,6 +95,17 @@ public class ChatActivityActionsButtonsLayout extends LinearLayout {
         forwardButton.setCompoundDrawablePadding(AndroidUtilities.dp(6));
         forwardButton.setTextColor(Theme.getColor(Theme.key_glass_defaultText, resourcesProvider));
         forwardButton.setTypeface(AndroidUtilities.bold());
+
+        if (button == replyButton && CherrygramMessagesConfig.INSTANCE.getLeftBottomButton() != CherrygramMessagesConfig.LEFT_BUTTON_REPLY) {
+            forwardButton.setSingleLine(true);
+            forwardButton.setEllipsize(TextUtils.TruncateAt.MARQUEE);
+            forwardButton.setMarqueeRepeatLimit(-1);
+            forwardButton.setHorizontallyScrolling(true);
+            forwardButton.setFocusable(true);
+            forwardButton.setFocusableInTouchMode(true);
+            forwardButton.setSelected(true);
+        }
+
         Drawable image = getContext().getResources().getDrawable(iconRes).mutate();
         image.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_glass_defaultIcon, resourcesProvider), PorterDuff.Mode.MULTIPLY));
         forwardButton.setCompoundDrawablesWithIntrinsicBounds(iconLeft ? image : null, null, iconLeft ? null : image, null);
@@ -150,7 +167,7 @@ public class ChatActivityActionsButtonsLayout extends LinearLayout {
 
     private void checkHolderPositionsAndVisibility(ButtonHolder holder) {
         final float visibility = totalVisibilityFactor * holder.visibilityAnimator.getFloatValue();
-        final float offsetY = dp(54) * (1f - visibility);
+        final float offsetY = -dp(54) * (1f - visibility);
         float offsetX = getMeasuredWidth() / 2f * (1f - AnimatorUtils.DECELERATE_INTERPOLATOR.getInterpolation(visibility));
         if (holder == replyButton) {
             offsetX *= -1;
@@ -166,8 +183,8 @@ public class ChatActivityActionsButtonsLayout extends LinearLayout {
         public ChatActivityBlurredRoundButton button;
         public TextView textView;
 
-        public BoolAnimator visibilityAnimator = new BoolAnimator(0, this, CubicBezierInterpolator.EASE_OUT_QUINT, 350, true);
-        public BoolAnimator enabledAnimator = new BoolAnimator(1, this, CubicBezierInterpolator.EASE_OUT_QUINT, 350, true);
+        public BoolAnimator visibilityAnimator = new BoolAnimator(0, this, CubicBezierInterpolator.EASE_OUT_QUINT, 320, true);
+        public BoolAnimator enabledAnimator = new BoolAnimator(1, this, CubicBezierInterpolator.EASE_OUT_QUINT, 320, true);
 
         @Override
         public void onFactorChanged(int id, float factor, float fraction, FactorAnimator callee) {
@@ -175,4 +192,42 @@ public class ChatActivityActionsButtonsLayout extends LinearLayout {
             checkHolderPositionsAndVisibility(this);
         }
     }
+
+    /** Cherrygram start */
+    private boolean noForwards;
+
+    public void setNoForwards(boolean b) {
+        this.noForwards = b;
+    }
+
+    public void setReplyButtonOnLongClickListener(View.OnLongClickListener listener) {
+        replyButton.button.setOnLongClickListener(listener);
+    }
+
+    public View getReplyButton() {
+        return replyButton.button;
+    }
+
+    public void updateReplyButtonUI(String text, @DrawableRes int iconRes, boolean iconLeft) {
+        updateButtonUI(replyButton, text, iconRes, iconLeft);
+    }
+
+    public void updateForwardButtonUI(String text, @DrawableRes int iconRes, boolean iconLeft) {
+        updateButtonUI(forwardButton, text, iconRes, iconLeft);
+    }
+
+    private void updateButtonUI(ButtonHolder holder, String text, @DrawableRes int iconRes, boolean iconLeft) {
+        if (holder.textView == null) return;
+
+        holder.textView.setText(text);
+
+        Drawable image = getContext().getResources().getDrawable(iconRes).mutate();
+        image.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_glass_defaultIcon, resourcesProvider), PorterDuff.Mode.MULTIPLY));
+        holder.textView.setCompoundDrawablesWithIntrinsicBounds(iconLeft ? image : null, null, iconLeft ? null : image, null);
+
+        holder.textView.invalidate();
+        holder.button.invalidate();
+    }
+    /** Cherrygram finish */
+
 }

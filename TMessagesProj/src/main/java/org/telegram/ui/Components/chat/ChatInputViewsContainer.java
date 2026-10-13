@@ -4,7 +4,6 @@ import static org.telegram.messenger.AndroidUtilities.dp;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -18,7 +17,6 @@ import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 
-import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.blur3.BlurredBackgroundWithFadeDrawable;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
@@ -40,7 +38,7 @@ public class ChatInputViewsContainer extends FrameLayout {
     // MDGram Etapa B2: barra de escribir plana estilo original (rectángulo opaco full-width,
     // sin píldora/blur ni esquinas redondeadas, pegado al fondo). Lo activa ChatActivity.
     public boolean mdFlatBackground;
-    private final Paint flatBgPaint = new Paint();
+    private final android.graphics.Paint flatBgPaint = new android.graphics.Paint();
 
     public ChatInputViewsContainer(@NonNull Context context) {
         super(context);
@@ -80,7 +78,8 @@ public class ChatInputViewsContainer extends FrameLayout {
 
 
 
-    private BlurredBackgroundDrawable blurredBackgroundDrawable;
+    public boolean drawInputBackground = true;
+    public BlurredBackgroundDrawable blurredBackgroundDrawable;
     private BlurredBackgroundDrawable underKeyboardBackgroundDrawable;
     public void setInputIslandBubbleDrawable(BlurredBackgroundDrawable drawable) {
         blurredBackgroundDrawable = drawable;
@@ -262,7 +261,7 @@ public class ChatInputViewsContainer extends FrameLayout {
             // color del panel, desde el tope del input hasta el borde inferior (cubre también el área
             // de la barra de navegación), sin esquinas redondeadas ni blur.
             if (inputBubbleHeightRound > 0) {
-                flatBgPaint.setColor(Theme.getColor(Theme.key_chat_messagePanelBackground));
+                flatBgPaint.setColor(org.telegram.ui.ActionBar.Theme.getColor(org.telegram.ui.ActionBar.Theme.key_chat_messagePanelBackground));
                 final int barTop = getMeasuredHeight() - inputBubbleHeightRound - Math.round(maxBottomInset);
                 canvas.drawRect(0, barTop, getMeasuredWidth(), getMeasuredHeight(), flatBgPaint);
             }
@@ -277,13 +276,32 @@ public class ChatInputViewsContainer extends FrameLayout {
             final int blurTop = getMeasuredHeight() - currentBlurredHeight;
 
             tmpRect.set(
-                Math.round(inputBubbleOffsetLeft), 0,
-                getMeasuredWidth() - Math.round(inputBubbleOffsetRight), inputBubbleHeightRound);
+                Math.round(inputBubbleOffsetLeft),
+                0,
+                getMeasuredWidth() - Math.round(inputBubbleOffsetRight),
+                inputBubbleHeightRound
+            );
             tmpRect.inset(0, -dp(7));
             tmpRect.offset(0, blurTop + (int) bubbleInputTranlationY);
 
             blurredBackgroundDrawable.setBounds(tmpRect);
-            blurredBackgroundDrawable.draw(canvas);
+            if (drawInputBackground)
+                blurredBackgroundDrawable.draw(canvas);
+
+            if (leftBubbleDrawable != null && leftBubbleSet) {
+                int bTop = blurTop + (int) bubbleInputTranlationY + inputBubbleHeightRound - BUBBLE_BUTTON_SIZE;
+                tmpRect2.set(leftBubbleLeft, bTop, leftBubbleRight, bTop + BUBBLE_BUTTON_SIZE);
+                leftBubbleDrawable.setBounds(tmpRect2);
+                leftBubbleDrawable.setAlpha(sideBubblesAlpha);
+                leftBubbleDrawable.draw(canvas);
+            }
+            if (rightBubbleDrawable != null && rightBubbleSet) {
+                int bTop = blurTop + (int) bubbleInputTranlationY + inputBubbleHeightRound - BUBBLE_BUTTON_SIZE;
+                tmpRect2.set(rightBubbleLeft, bTop, rightBubbleRight, bTop + BUBBLE_BUTTON_SIZE);
+                rightBubbleDrawable.setBounds(tmpRect2);
+                rightBubbleDrawable.setAlpha(sideBubblesAlpha);
+                rightBubbleDrawable.draw(canvas);
+            }
 
             if (needDrawInAppKeyboard) {
                 underKeyboardBackgroundDrawable.draw(canvas);
@@ -376,4 +394,49 @@ public class ChatInputViewsContainer extends FrameLayout {
 
         return captured;
     }
+
+    /** Cherrygram start */
+    private final Rect tmpRect2 = new Rect();
+
+    public BlurredBackgroundDrawable leftBubbleDrawable;
+    public BlurredBackgroundDrawable rightBubbleDrawable;
+
+    private final int BUBBLE_BUTTON_SIZE = dp(44);
+    private int sideBubblesAlpha = 255;
+
+    public void setLeftBubbleDrawable(BlurredBackgroundDrawable drawable) {
+        leftBubbleDrawable = drawable;
+        leftBubbleDrawable.setRadius(dp(22));
+    }
+
+    public void setRightBubbleDrawable(BlurredBackgroundDrawable drawable) {
+        rightBubbleDrawable = drawable;
+        rightBubbleDrawable.setRadius(dp(22));
+    }
+
+    private int leftBubbleLeft, leftBubbleRight;
+    private int rightBubbleLeft, rightBubbleRight;
+    private boolean leftBubbleSet, rightBubbleSet;
+
+    public void setLeftBubbleBounds(int left, int right) {
+        leftBubbleLeft = left;
+        leftBubbleRight = right;
+        leftBubbleSet = true;
+        invalidate();
+    }
+
+    public void setRightBubbleBounds(int left, int right) {
+        rightBubbleLeft = left;
+        rightBubbleRight = right;
+        rightBubbleSet = true;
+        invalidate();
+    }
+
+    public void setSideBubblesAlpha(int alpha) {
+        if (sideBubblesAlpha != alpha) {
+            sideBubblesAlpha = alpha;
+            invalidate();
+        }
+    }
+    /** Cherrygram finish */
 }

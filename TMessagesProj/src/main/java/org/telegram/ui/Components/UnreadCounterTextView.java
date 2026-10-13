@@ -270,4 +270,11 @@ public class UnreadCounterTextView extends View {
         this.textColorKey = textColorKey;
         invalidate();
     }
+
+    /** Cherrygram start */
+    public CharSequence getText() {
+        return lastText;
+    }
+    /** Cherrygram finish */
+
 }

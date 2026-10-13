@@ -31,8 +31,10 @@ import org.telegram.ui.ActionBar.Theme;
 
 import java.util.ArrayList;
 
+import uz.unnarsx.cherrygram.chats.ui.MessageMenuHelper;
+
 public class PopupSwipeBackLayout extends FrameLayout {
-    private final static int DURATION = 300;
+    private final static int DURATION = MessageMenuHelper.getInstance(UserConfig.selectedAccount).allowNewMessageMenu() ? 400 : 300;
 
     SparseIntArray overrideHeightIndex = new SparseIntArray();
     public float transitionProgress;
@@ -133,7 +135,7 @@ public class PopupSwipeBackLayout extends FrameLayout {
     protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
         int i = indexOfChild(child);
         int s = canvas.save();
-        if (i != 0) {
+        if (!MessageMenuHelper.getInstance(UserConfig.selectedAccount).allowNewMessageMenu() && i != 0) {
             if (foregroundColor == 0) {
                 foregroundPaint.setColor(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground, resourcesProvider));
             } else {
@@ -143,8 +145,24 @@ public class PopupSwipeBackLayout extends FrameLayout {
         }
         boolean b = super.drawChild(canvas, child, drawingTime);
         if (i == 0) {
-            overlayPaint.setAlpha((int) (transitionProgress * 0x40));
-            canvas.drawRect(0, 0, getWidth(), getHeight(), overlayPaint);
+            float overlayRight;
+            if (MessageMenuHelper.getInstance(UserConfig.selectedAccount).allowNewMessageMenu()) {
+                View fg = null;
+                if (currentForegroundIndex >= 0 && currentForegroundIndex < getChildCount()) {
+                    fg = getChildAt(currentForegroundIndex);
+                }
+                overlayRight = getWidth();
+                if (fg != null) {
+                    overlayRight = Math.max(0f, Math.min(getWidth(), fg.getX()));
+                }
+            } else {
+                overlayRight = getWidth();
+            }
+
+            if (overlayRight > 0f) {
+                overlayPaint.setAlpha((int) (transitionProgress * 0x40));
+                canvas.drawRect(0, 0, overlayRight, getHeight(), overlayPaint);
+            }
         }
         canvas.restoreToCount(s);
         return b;
@@ -174,7 +192,7 @@ public class PopupSwipeBackLayout extends FrameLayout {
         if (currentForegroundIndex >= 0 && currentForegroundIndex < getChildCount()) {
             foregroundView = getChildAt(currentForegroundIndex);
         }
-        backgroundView.setTranslationX(-transitionProgress * getWidth() * 0.5f);
+        backgroundView.setTranslationX(-transitionProgress * getWidth() * (MessageMenuHelper.getInstance(UserConfig.selectedAccount).allowNewMessageMenu() ? 1f : 0.5f));
         float bSc = 0.95f + (1f - transitionProgress) * 0.05f;
         backgroundView.setScaleX(bSc);
         backgroundView.setScaleY(bSc);

@@ -7,24 +7,21 @@ import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.style.CharacterStyle;
-import android.text.style.ClickableSpan;
 import android.text.style.URLSpan;
 import android.text.util.Linkify;
-import android.util.Log;
 import android.util.LongSparseArray;
 import android.util.SparseBooleanArray;
 
 import org.telegram.tgnet.ConnectionsManager;
+import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ChatActivity;
-import org.telegram.ui.Components.AnimatedEmojiSpan;
 import org.telegram.ui.Components.MessagePreviewView;
 
-import java.io.File;
-import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+
+import uz.unnarsx.cherrygram.core.configs.CherrygramChatsConfig;
+import uz.unnarsx.cherrygram.core.configs.CherrygramMessagesConfig;
 
 public class MessagePreviewParams {
 
@@ -43,7 +40,7 @@ public class MessagePreviewParams {
         public ArrayList<MessageObject> messages;
         public ArrayList<MessageObject> previewMessages = new ArrayList<>();
         public SparseBooleanArray selectedIds = new SparseBooleanArray();
-        public ArrayList<TLRPC.TL_pollAnswerVoters> pollChosenAnswers = new ArrayList<>();
+        public ArrayList<TLRPC.PollAnswerVoters> pollChosenAnswers = new ArrayList<>();
         public boolean hasSpoilers;
         public boolean hasText;
 
@@ -101,9 +98,9 @@ public class MessagePreviewParams {
 
                     if (messageObject.canUnvote()) {
                         for (int a = 0, N = mediaPoll.results.results.size(); a < N; a++) {
-                            TLRPC.TL_pollAnswerVoters answer = mediaPoll.results.results.get(a);
+                            TLRPC.PollAnswerVoters answer = mediaPoll.results.results.get(a);
                             if (answer.chosen) {
-                                TLRPC.TL_pollAnswerVoters newAnswer = new TLRPC.TL_pollAnswerVoters();
+                                TLRPC.PollAnswerVoters newAnswer = new TLRPC.PollAnswerVoters();
                                 newAnswer.chosen = answer.chosen;
                                 newAnswer.correct = answer.correct;
                                 newAnswer.flags = answer.flags;
@@ -184,8 +181,8 @@ public class MessagePreviewParams {
     public boolean isSecret;
     public boolean multipleUsers;
 
-    public boolean hideForwardSendersName;
-    public boolean hideCaption;
+    public boolean hideForwardSendersName = CherrygramChatsConfig.INSTANCE.getNoAuthorship();
+    public boolean hideCaption = CherrygramChatsConfig.INSTANCE.getNoCaptions();
     public boolean willSeeSenders;
 
     public boolean singleLink;
@@ -456,8 +453,9 @@ public class MessagePreviewParams {
         message.peer_id = messageObject.messageOwner.peer_id;
         message.from_id = messageObject.messageOwner.from_id;
         message.message = messageObject.messageOwner.message;
+        message.rich_message = messageObject.messageOwner.rich_message;
         message.media = messageObject.messageOwner.media;
-        message.action =  messageObject.messageOwner.action;
+        message.action = messageObject.messageOwner.action;
         message.edit_date = 0;
         if (messageObject.messageOwner.entities != null) {
             message.entities.addAll(messageObject.messageOwner.entities);
@@ -504,7 +502,21 @@ public class MessagePreviewParams {
             }
             if (header != null) {
                 message.fwd_from = header;
+                if (CherrygramMessagesConfig.INSTANCE.getMsgForwardDate() && !messageObject.isForwarded()) {
+                    message.fwd_from.date = messageObject.messageOwner.date;
+                }
                 message.flags |= TLRPC.MESSAGE_FLAG_FWD;
+            }
+
+            if (messageObject.isWelcomeAnchored()) {
+                message.id = messageObject.getEphemeralId();
+                if (message.fwd_from != null && message.fwd_from.from_id != null) {
+                    message.fwd_from.from_id = TLObject.deepCopy(messageObject.messageOwner.peer_id, TLRPC.Peer::TLdeserialize);
+                    final long dialogId = DialogObject.getPeerDialogId(messageObject.messageOwner.from_id);
+                    if (dialogId > 0) {
+                        message.via_bot_id = dialogId;
+                    }
+                }
             }
         }
 

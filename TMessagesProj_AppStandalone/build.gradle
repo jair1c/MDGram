@@ -1,13 +1,36 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'com.google.firebase.crashlytics'
 
-// MDGram: firma de release desde una keystore propia. La ruta/alias y la contraseña viven en
-// keystore.properties (raíz del proyecto, FUERA de git). Si el archivo no existe, cae a la keystore
-// por defecto de NekoX (para no romper builds de quien no tenga el archivo).
-def mdKeystorePropsFile = rootProject.file("keystore.properties")
-def mdKeystoreProps = new Properties()
-if (mdKeystorePropsFile.exists()) {
-    mdKeystoreProps.load(new FileInputStream(mdKeystorePropsFile))
+import java.util.Properties
+
+def mdgramKeystorePropertiesFile = rootProject.file('keystore.properties')
+def mdgramKeystoreProperties = new Properties()
+if (mdgramKeystorePropertiesFile.exists()) {
+    mdgramKeystorePropertiesFile.withInputStream { stream ->
+        mdgramKeystoreProperties.load(stream)
+    }
 }
+
+def mdgramConfiguredStorePath = mdgramKeystoreProperties.getProperty('RELEASE_STORE_FILE', '').trim()
+def mdgramConfiguredStoreFile = mdgramConfiguredStorePath ? new File(mdgramConfiguredStorePath) : null
+if (mdgramConfiguredStoreFile != null && !mdgramConfiguredStoreFile.isAbsolute()) {
+    mdgramConfiguredStoreFile = rootProject.file(mdgramConfiguredStorePath)
+}
+// A properties file copied from another PC may contain an obsolete absolute path.
+// In that case, accept the same keystore filename beside keystore.properties.
+if (mdgramConfiguredStoreFile != null && !mdgramConfiguredStoreFile.exists()) {
+    def portableStoreFile = rootProject.file(mdgramConfiguredStoreFile.name)
+    if (portableStoreFile.exists()) {
+        mdgramConfiguredStoreFile = portableStoreFile
+    }
+}
+
+def mdgramReleaseSigningReady = mdgramKeystorePropertiesFile.exists() &&
+        mdgramConfiguredStoreFile != null && mdgramConfiguredStoreFile.exists() &&
+        !mdgramKeystoreProperties.getProperty('RELEASE_STORE_PASSWORD', '').trim().isEmpty() &&
+        !mdgramKeystoreProperties.getProperty('RELEASE_KEY_ALIAS', '').trim().isEmpty() &&
+        !mdgramKeystoreProperties.getProperty('RELEASE_KEY_PASSWORD', '').trim().isEmpty()
 
 repositories {
     mavenCentral()
@@ -25,15 +48,15 @@ configurations.all {
 
 dependencies {
     implementation project(':TMessagesProj')
-    implementation 'androidx.fragment:fragment:1.8.9'
-    implementation 'androidx.core:core:1.16.0'
+    implementation 'androidx.fragment:fragment-ktx:1.9.0'
+    implementation 'androidx.core:core-ktx:1.18.0'
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
     implementation files('../TMessagesProj/libs/libgsaverification-client.aar')
 }
 
 android {
-    compileSdkVersion 35
-    buildToolsVersion '35.0.0'
+    compileSdkVersion 36
+    buildToolsVersion '36.0.0'
 
     defaultConfig.applicationId = "com.mdgram.messenger"
 
@@ -46,10 +69,14 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
 
         coreLibraryDesugaringEnabled true
+    }
+
+    androidResources {
+        localeFilters += ["en", "ar", "de", "es", "it", "ko", "nl", "pt-rBR", "ru", "uk"]
     }
 
     signingConfigs {
@@ -61,18 +88,10 @@ android {
         }
 
         release {
-            // MDGram: usa la keystore propia (keystore.properties) si existe; si no, la de NekoX.
-            if (mdKeystorePropsFile.exists()) {
-                storeFile file(mdKeystoreProps['RELEASE_STORE_FILE'])
-                storePassword mdKeystoreProps['RELEASE_STORE_PASSWORD']
-                keyAlias mdKeystoreProps['RELEASE_KEY_ALIAS']
-                keyPassword mdKeystoreProps['RELEASE_KEY_PASSWORD']
-            } else {
-                storeFile file("../TMessagesProj/config/release.keystore")
-                storePassword RELEASE_STORE_PASSWORD
-                keyAlias RELEASE_KEY_ALIAS
-                keyPassword RELEASE_KEY_PASSWORD
-            }
+            storeFile mdgramConfiguredStoreFile ?: rootProject.file('mdgram-release.jks')
+            storePassword mdgramKeystoreProperties.getProperty('RELEASE_STORE_PASSWORD', '')
+            keyAlias mdgramKeystoreProperties.getProperty('RELEASE_KEY_ALIAS', '')
+            keyPassword mdgramKeystoreProperties.getProperty('RELEASE_KEY_PASSWORD', '')
         }
     }
 
@@ -88,14 +107,11 @@ android {
             ndk.debugSymbolLevel = 'FULL'
         }
         standalone {
+            matchingFallbacks = ['release']
             debuggable false
             jniDebuggable false
             signingConfig signingConfigs.release
-            applicationIdSuffix ".web"
-            // MDGram: minify OFF en el primer release (el R8/proguard de este fork no se probó; el
-            // build debug con minify off funciona 1:1). Activar a true después como optimización de
-            // tamaño/ofuscación, verificando que no rompa nada.
-            minifyEnabled false
+            minifyEnabled true
             multiDexEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), '../TMessagesProj/proguard-rules.pro'
             ndk.debugSymbolLevel = 'FULL'
@@ -114,7 +130,6 @@ android {
     productFlavors {
         afat {
             ndk {
-                // MDGram: dropeados x86/x86_64 (casi ningún teléfono real los usa) → build ~más rápido + universal más liviano
                 abiFilters "armeabi-v7a", "arm64-v8a"
             }
             ext {
@@ -126,28 +141,11 @@ android {
         }
     }
 
-    // MDGram: split APKs por ABI para el release (arm64/armv7a livianos + universal). Gateado con
-    // -PabiSplits para NO afectar el flujo debug diario (sin la propiedad → un solo app.apk como antes).
-    // El universal (universalApk) incluye las 4 ABIs (= el de siempre); los per-ABI solo la suya.
-    splits {
-        abi {
-            enable project.hasProperty('abiSplits')
-            reset()
-            include "armeabi-v7a", "arm64-v8a"
-            universalApk true
-        }
-    }
-
     defaultConfig.versionCode = Integer.parseInt(APP_VERSION_CODE)
 
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
-            def mdAbi = output.getFilter(com.android.build.OutputFile.ABI)
-            if (project.hasProperty('abiSplits')) {
-                outputFileName = (mdAbi != null) ? "app-${mdAbi}.apk" : "app-universal.apk"
-            } else {
-                outputFileName = "app.apk"
-            }
+            outputFileName = "app.apk"
             output.versionCodeOverride = defaultConfig.versionCode * 10 + variant.productFlavors.get(0).abiVersionCode
         }
     }
@@ -160,10 +158,10 @@ android {
     }
 
     defaultConfig {
-        minSdkVersion 21
-        targetSdkVersion 35
+        minSdkVersion 24
+        targetSdkVersion 36
         versionName APP_VERSION_NAME
-        ndkVersion "21.4.7075529"
+        ndkVersion "27.2.12479018"
 
         multiDexEnabled true
 
@@ -171,8 +169,9 @@ android {
 
         externalNativeBuild {
             cmake {
-                version '3.10.2'
+                version '3.22.1'
                 arguments '-DANDROID_STL=c++_static', '-DANDROID_PLATFORM=android-21' //, '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON'
+                targets 'tmessages.49'
             }
         }
     }
@@ -184,5 +183,24 @@ android {
 
     lintOptions {
         checkReleaseBuilds false
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name == 'validateSigningAfatStandalone') {
+        task.doFirst {
+            if (!mdgramReleaseSigningReady) {
+                throw new GradleException('Firma MDGram incompleta: coloca mdgram-release.jks junto a keystore.properties (o corrige RELEASE_STORE_FILE) antes de compilar standalone.')
+            }
+        }
+    }
+}
+
+apply plugin: 'com.google.gms.google-services'
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    kotlinOptions {
+        jvmTarget = "17"
+        freeCompilerArgs += ["-Xskip-metadata-version-check"]
     }
 }

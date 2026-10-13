@@ -10,10 +10,17 @@ package org.telegram.messenger;
 
 import android.app.Service;
 import android.content.Intent;
+import android.os.Build;
 import android.os.IBinder;
+import android.text.TextUtils;
 
+import androidx.annotation.RequiresApi;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+
+import org.telegram.tgnet.TLRPC;
+
+import uz.unnarsx.cherrygram.core.firebase.crashlytics.FirebaseCrashlyticsHelper;
 
 public class VideoEncodingService extends Service implements NotificationCenter.NotificationCenterDelegate {
 
@@ -34,6 +41,7 @@ public class VideoEncodingService extends Service implements NotificationCenter.
                 Intent intent = new Intent(ApplicationLoader.applicationContext, VideoEncodingService.class);
                 ApplicationLoader.applicationContext.startService(intent);
             } catch (Exception e) {
+                FirebaseCrashlyticsHelper.INSTANCE.logAsNonFatal(e);
                 FileLog.e(e);
             }
         } else if (cancelled) {
@@ -64,8 +72,8 @@ public class VideoEncodingService extends Service implements NotificationCenter.
         instance = null;
         try {
             stopForeground(true);
-        } catch (Throwable ignore) {
-
+        } catch (Throwable e) {
+            FirebaseCrashlyticsHelper.INSTANCE.logAsNonFatal(e);
         }
         NotificationManagerCompat.from(ApplicationLoader.applicationContext).cancel(4);
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.fileUploadProgressChanged);
@@ -113,6 +121,7 @@ public class VideoEncodingService extends Service implements NotificationCenter.
             }
             NotificationManagerCompat.from(ApplicationLoader.applicationContext).notify(4, builder.build());
         } catch (Throwable e) {
+            FirebaseCrashlyticsHelper.INSTANCE.logAsNonFatal(e);
             FileLog.e(e);
         }
     }
@@ -133,12 +142,13 @@ public class VideoEncodingService extends Service implements NotificationCenter.
             builder.setSmallIcon(android.R.drawable.stat_sys_upload);
             builder.setWhen(System.currentTimeMillis());
             builder.setChannelId(NotificationsController.OTHER_NOTIFICATIONS_CHANNEL);
-            builder.setContentTitle(LocaleController.getString(R.string.AppName));
+            builder.setContentTitle(LocaleController.getString(R.string.CG_AppName));
         }
         setCurrentMessage(videoConvertMessage);
         try {
             startForeground(4, builder.build());
         } catch (Throwable e) {
+            FirebaseCrashlyticsHelper.INSTANCE.logAsNonFatal(e);
             //ignore ForegroundServiceStartNotAllowedException
             FileLog.e(e);
         }
@@ -151,16 +161,42 @@ public class VideoEncodingService extends Service implements NotificationCenter.
             return;
         }
         boolean isGif = videoConvertMessage.messageObject != null && MessageObject.isGifMessage(videoConvertMessage.messageObject.messageOwner);
+        String status;
         if (videoConvertMessage.foregroundConversion) {
-            builder.setTicker(LocaleController.getString(R.string.ConvertingVideo));
-            builder.setContentText(LocaleController.getString(R.string.ConvertingVideo));
+            status = LocaleController.getString(R.string.ConvertingVideo);
         } else if (isGif) {
-            builder.setTicker(LocaleController.getString(R.string.SendingGif));
-            builder.setContentText(LocaleController.getString(R.string.SendingGif));
+            status = LocaleController.getString(R.string.SendingGif);
         } else {
-            builder.setTicker(LocaleController.getString(R.string.SendingVideo));
-            builder.setContentText(LocaleController.getString(R.string.SendingVideo));
+            status = LocaleController.getString(R.string.SendingVideo);
         }
+
+        String name = "";
+        if (videoConvertMessage.messageObject != null) {
+            long dialogId = videoConvertMessage.messageObject.getDialogId();
+
+            if (DialogObject.isUserDialog(dialogId)) {
+                TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(dialogId);
+                if (user != null) {
+                    name = UserObject.getUserName(user);
+                }
+            } else if (DialogObject.isChatDialog(dialogId)) {
+                TLRPC.Chat chat = MessagesController.getInstance(currentAccount).getChat(-dialogId);
+                if (chat != null) {
+                    name = chat.title;
+                }
+            }
+        }
+
+        String finalText;
+        if (!TextUtils.isEmpty(name)) {
+            finalText = name + " • " + status;
+        } else {
+            finalText = status;
+        }
+
+        builder.setTicker(finalText);
+        builder.setContentText(finalText);
+
         int currentProgress = 0;
         builder.setProgress(100, currentProgress, true);
     }
@@ -189,5 +225,31 @@ public class VideoEncodingService extends Service implements NotificationCenter.
     public static boolean isRunning() {
         return instance != null;
     }
+
+    /** Cherrygram start */
+    @Override
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE) // API 34
+    public void onTimeout(int startId, int fgsType) {
+        super.onTimeout(startId, fgsType);
+        if (BuildVars.LOGS_ENABLED) {
+            FileLog.d("VideoEncodingService: onTimeout fired (fgsType=" + fgsType + "), forcing stop");
+        }
+        try {
+            FirebaseCrashlyticsHelper.INSTANCE.logAsNonFatal(
+                    new RuntimeException("VideoEncodingService onTimeout, fgsType=" + fgsType)
+            );
+        } catch (Throwable ignore) {}
+        stopForegroundAndSelf();
+    }
+
+    private void stopForegroundAndSelf() {
+        try {
+            stopForeground(true);
+        } catch (Throwable e) {
+            FirebaseCrashlyticsHelper.INSTANCE.logAsNonFatal(e);
+        }
+        stopSelf();
+    }
+    /** Cherrygram finish */
 
 }

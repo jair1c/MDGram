@@ -40,6 +40,7 @@ import org.telegram.messenger.voip.Instance;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.AlertDialog;
+import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ActionBar.ThemeDescription;
@@ -179,13 +180,15 @@ public class DataSettingsActivity extends BaseFragment {
 //        autoplaySectionRow = rowCount++;
         streamSectionRow = rowCount++;
         enableStreamRow = rowCount++;
-        if (BuildVars.DEBUG_VERSION) {
+        enableMkvRow = rowCount++;
+        enableAllStreamRow = rowCount++;
+        /*if (BuildVars.DEBUG_VERSION) {
             enableMkvRow = rowCount++;
             enableAllStreamRow = rowCount++;
         } else {
             enableAllStreamRow = -1;
             enableMkvRow = -1;
-        }
+        }*/
         enableAllStreamInfoRow = rowCount++;
 
         enableCacheStreamRow = -1;//rowCount++;
@@ -263,9 +266,6 @@ public class DataSettingsActivity extends BaseFragment {
     public View createView(Context context) {
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
         actionBar.setTitle(LocaleController.getString(R.string.DataSettings));
-        if (AndroidUtilities.isTablet()) {
-            actionBar.setOccupyStatusBar(false);
-        }
         actionBar.setAllowOverlayTitle(true);
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
@@ -275,6 +275,9 @@ public class DataSettingsActivity extends BaseFragment {
                 }
             }
         });
+        if (parentLayout != null && parentLayout.isRightLayout()) {
+            actionBar.setBackButtonImage(R.drawable.ic_ab_close);
+        }
 
         listAdapter = new ListAdapter(context);
 
@@ -355,7 +358,7 @@ public class DataSettingsActivity extends BaseFragment {
                     SharedPreferences.Editor editor = MessagesController.getMainSettings(currentAccount).edit();
                     editor.putString(key, preset.toString());
                     editor.putInt(key2, 3);
-                    editor.commit();
+                    editor.apply();
 
                     cell.setChecked(!checked);
                     RecyclerView.ViewHolder holder = listView.findContainingViewHolder(view);
@@ -410,7 +413,7 @@ public class DataSettingsActivity extends BaseFragment {
                         editor.putInt("currentRoamingPreset", DownloadController.getInstance(currentAccount).currentRoamingPreset = 3);
                         editor.putString(key, preset.toString());
                     }
-                    editor.commit();
+                    editor.apply();
                     DownloadController.getInstance(currentAccount).checkAutodownloadSettings();
                     for (int a = 0; a < 3; a++) {
                         DownloadController.getInstance(currentAccount).savePresetToServer(a);
@@ -466,7 +469,7 @@ public class DataSettingsActivity extends BaseFragment {
                                     break;
                             }
                             if (val != -1) {
-                                preferences.edit().putInt("VoipDataSaving", val).commit();
+                                preferences.edit().putInt("VoipDataSaving", val).apply();
                                 updateVoipUseLessData = true;
                             }
                             if (listAdapter != null) {

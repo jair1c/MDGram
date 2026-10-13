@@ -174,15 +174,15 @@ public class NewContactBottomSheet extends BottomSheet implements AdapterView.On
         ScrollView fragmentView = new ScrollView(context);
 
         contentLayout = new LinearLayout(context);
-        contentLayout.setPadding(dp(20), 0, dp(20), 0);
+        contentLayout.setPadding(dp(16), 0, dp(16), 0);
         contentLayout.setOrientation(LinearLayout.VERTICAL);
-        fragmentView.addView(contentLayout, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP));
+        fragmentView.addView(contentLayout, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP));;
         contentLayout.setOnTouchListener((v, event) -> true);
 
         FrameLayout frameLayout = new FrameLayout(context);
         contentLayout.addView(frameLayout, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 0));
 
-        firstNameField = new OutlineEditText(context);
+        firstNameField = new OutlineEditText(context, resourcesProvider);
         firstNameField.getEditText().setInputType(InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_AUTO_CORRECT);
         firstNameField.getEditText().setImeOptions(EditorInfo.IME_ACTION_NEXT);
         firstNameField.setHint(LocaleController.getString(R.string.FirstName));
@@ -200,7 +200,7 @@ public class NewContactBottomSheet extends BottomSheet implements AdapterView.On
             return false;
         });
 
-        lastNameField = new OutlineEditText(context);
+        lastNameField = new OutlineEditText(context, resourcesProvider);
         lastNameField.setBackground(null);
         lastNameField.getEditText().setInputType(InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_AUTO_CORRECT);
         lastNameField.getEditText().setImeOptions(EditorInfo.IME_ACTION_NEXT);
@@ -591,7 +591,7 @@ public class NewContactBottomSheet extends BottomSheet implements AdapterView.On
         checkTextView = new TextView(context);
         checkTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
         checkTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-        checkTextView.setText("Sync Contact to Phone");
+        checkTextView.setText(getString(R.string.AddContactSync));
 
         checkLayout = new LinearLayout(context);
         checkLayout.setOrientation(LinearLayout.HORIZONTAL);
@@ -649,10 +649,11 @@ public class NewContactBottomSheet extends BottomSheet implements AdapterView.On
         qrButtonContainer.addView(qrButtonSeparator, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 1.0f / AndroidUtilities.density, Gravity.TOP, 0, 6, 0, 0));
 
         qrButton = new ButtonWithCounterView(context, false, resourcesProvider);
+        qrButton.setRound();
         SpannableStringBuilder qrButtonText = new SpannableStringBuilder("QR");
         qrButtonText.setSpan(new ColoredImageSpan(R.drawable.header_qr_24), 0, qrButtonText.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         qrButtonText.append("  ");
-        qrButtonText.append("Add via QR Code");
+        qrButtonText.append(getString(R.string.AddContactQr));
         qrButton.setText(qrButtonText, false);
         qrButton.setOnClickListener(v -> {
             dismiss();
@@ -686,7 +687,7 @@ public class NewContactBottomSheet extends BottomSheet implements AdapterView.On
         });
         qrButtonContainer.addView(qrButton, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.TOP, 0, 12, 0, 0));
 
-        notesField = new OutlineEditText(context);
+        notesField = new OutlineEditText(context, resourcesProvider);
         notesField.setBackground(null);
         notesField.getEditText().setInputType(InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_AUTO_CORRECT);
         notesField.getEditText().setImeOptions(EditorInfo.IME_ACTION_NEXT);
@@ -704,8 +705,7 @@ public class NewContactBottomSheet extends BottomSheet implements AdapterView.On
 
         HashMap<String, String> languageMap = new HashMap<>();
 
-        try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(ApplicationLoader.applicationContext.getResources().getAssets().open("countries.txt")));
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(ApplicationLoader.applicationContext.getResources().getAssets().open("countries.txt")))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 String[] args = line.split(";");
@@ -726,7 +726,6 @@ public class NewContactBottomSheet extends BottomSheet implements AdapterView.On
                 }
                 languageMap.put(args[1], args[2]);
             }
-            reader.close();
         } catch (Exception e) {
             FileLog.e(e);
         }
@@ -795,17 +794,18 @@ public class NewContactBottomSheet extends BottomSheet implements AdapterView.On
         doneButton.setTextColor(parentFragment.getThemedColor(Theme.key_featuredStickers_buttonText));
         doneButton.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
         doneButton.setTypeface(AndroidUtilities.bold());
+        ScaleStateListAnimator.apply(doneButtonContainer, .02f, 1.2f);
 
         progressView = new RadialProgressView(context);
         progressView.setSize(dp(20));
         progressView.setProgressColor(parentFragment.getThemedColor(Theme.key_featuredStickers_buttonText));
         doneButtonContainer.addView(doneButton, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         doneButtonContainer.addView(progressView, LayoutHelper.createFrame(40, 40, Gravity.CENTER));
-        contentLayout.addView(doneButtonContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 0, 0, 16, 0, 16));
+        contentLayout.addView(doneButtonContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 0, 0, 8, 0, 4));
 
         AndroidUtilities.updateViewVisibilityAnimated(doneButton, true, 1f, false);
         AndroidUtilities.updateViewVisibilityAnimated(progressView, false, 1f, false);
-        doneButtonContainer.setBackground(Theme.AdaptiveRipple.filledRect(parentFragment.getThemedColor(Theme.key_featuredStickers_addButton), 6));
+        doneButtonContainer.setBackground(Theme.AdaptiveRipple.filledRect(parentFragment.getThemedColor(Theme.key_featuredStickers_addButton), 24));
         doneButtonContainer.setOnClickListener(v -> doOnDone());
 
         plusTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
@@ -1105,14 +1105,12 @@ public class NewContactBottomSheet extends BottomSheet implements AdapterView.On
 
     public static String getPhoneNumber(Context context, TLRPC.User user, String number, boolean withCoutryCode) {
         HashMap<String, String> codesMap = new HashMap<>();
-        try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(context.getResources().getAssets().open("countries.txt")));
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(context.getResources().getAssets().open("countries.txt")))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 String[] args = line.split(";");
                 codesMap.put(args[0], args[2]);
             }
-            reader.close();
         } catch (Exception e) {
             FileLog.e(e);
         }

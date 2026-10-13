@@ -21,6 +21,8 @@ import org.telegram.ui.LaunchActivity;
 
 import java.util.ArrayList;
 
+import uz.unnarsx.cherrygram.core.firebase.crashlytics.FirebaseCrashlyticsHelper;
+
 public class LocationSharingService extends Service implements NotificationCenter.NotificationCenterDelegate {
 
     private NotificationCompat.Builder builder;
@@ -141,7 +143,7 @@ public class LocationSharingService extends Service implements NotificationCente
                 builder.setContentIntent(contentIntent);
                 NotificationsController.checkOtherNotificationsChannel();
                 builder.setChannelId(NotificationsController.OTHER_NOTIFICATIONS_CHANNEL);
-                builder.setContentTitle(LocaleController.getString(R.string.AppName));
+                builder.setContentTitle(LocaleController.getString(R.string.CG_AppName));
                 Intent stopIntent = new Intent(ApplicationLoader.applicationContext, StopLiveLocationReceiver.class);
                 builder.addAction(0, LocaleController.getString(R.string.StopLiveLocation), PendingIntent.getBroadcast(ApplicationLoader.applicationContext, 2, stopIntent, PendingIntent.FLAG_MUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
             }
@@ -149,6 +151,7 @@ public class LocationSharingService extends Service implements NotificationCente
             updateNotification(false);
             startForeground(6, builder.build());
         } catch (Throwable e) {
+            FirebaseCrashlyticsHelper.INSTANCE.logAsNonFatal(e);
             FileLog.e(e);
         }
         return Service.START_NOT_STICKY;

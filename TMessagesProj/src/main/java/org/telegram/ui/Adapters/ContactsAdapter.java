@@ -70,6 +70,7 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
     private boolean isEmpty;
     private boolean hasPhonebook;
     public boolean isEmptyWithMainTabs;
+    private boolean mdgramMainContacts;
 
     BaseFragment fragment;
 
@@ -86,6 +87,11 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
 
     public void setDisableSections(boolean value) {
         disableSections = value;
+    }
+
+    public void setMdgramMainContacts(boolean value) {
+        mdgramMainContacts = value;
+        notifyDataSetChanged();
     }
 
     public static final int SORT_TYPE_NONE = 0;
@@ -245,6 +251,8 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
             if (section == 0) {
                 if (isAdmin) {
                     return row < 1;
+                } else if (mdgramMainContacts) {
+                    return row < 3;
                 } else if (needPhonebook) {
                     return row < 2;
                 } else {
@@ -298,7 +306,7 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
         }
 
         hasPhonebook = !ContactsController.getInstance(currentAccount).phoneBookContacts.isEmpty();
-        isEmptyWithMainTabs = isEmpty && needPhonebook && !isAdmin && onlyUsers == 0;
+        isEmptyWithMainTabs = isEmpty && needPhonebook && !mdgramMainContacts && !isAdmin && onlyUsers == 0;
         if (isEmptyWithMainTabs) {
             // empty + invite friends
             return hasPhonebook ? 2 : 1;
@@ -339,6 +347,9 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
             }
         } else {
             if (section == 0) {
+                if (mdgramMainContacts) {
+                    return (includeSearch ? 1 : 0) + (isEmpty ? 3 : 4);
+                }
                 if (isEmpty) {
                     return (includeSearch ? 1 : 0) + 2;
                 }
@@ -447,8 +458,11 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
                 break;
             }
             case USER_CELL: {
-                UserCell cell = new UserCell(mContext, 58, 1, false);
+                UserCell cell = new UserCell(mContext, 58, 1, false, false, null, true, true);
                 cell.setCallCellStyle(58);
+                if (mdgramMainContacts) {
+                    cell.setNameTypeface(AndroidUtilities.getTypeface("fonts/LinotteFon.ttf"));
+                }
                 view = cell;
                 break;
             }
@@ -560,7 +574,18 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
                     textCell.setColors(Theme.key_telegram_color_text, Theme.key_telegram_color_text);
                 }
                 if (section == 0) {
-                    if (needPhonebook) {
+                    if (mdgramMainContacts) {
+                        textCell.setColors(Theme.key_windowBackgroundWhiteGrayText, Theme.key_windowBackgroundWhiteBlackText);
+                        if (position == 0) {
+                            textCell.setTextAndIcon(getString(R.string.NewGroup), R.drawable.msg_groups, false);
+                        } else if (position == 1) {
+                            textCell.setTextAndIcon(getString(R.string.NewSecretChat), R.drawable.msg_secret, false);
+                        } else if (position == 2) {
+                            textCell.setTextAndIcon(getString(R.string.NewChannel), R.drawable.msg_channel, false);
+                        }
+                        textCell.setOffsetFromImage(58);
+                        textCell.setImageLeft(18);
+                    } else if (needPhonebook) {
                         if (position == 0) {
                             textCell.setTextAndValueAndColorfulIcon(getString(R.string.InviteFriends), "", false, R.drawable.settings_invite, 0xFF1CA5ED, 0xFF1488E1, false);
                         } else if (position == 1) {
@@ -651,6 +676,11 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
                     if (position == 2) {
                         return (sortType == SORT_TYPE_BY_NAME || sortType == SORT_TYPE_BY_TIME ? HEADER_CELL : GRAY_CELL);
                     }
+                } else if (mdgramMainContacts) {
+                    if (position < 3) {
+                        return TEXT_CELL;
+                    }
+                    return GRAY_CELL;
                 } else if (needPhonebook) {
                     if (position < 2) {
                         return TEXT_CELL;
@@ -659,7 +689,7 @@ public class ContactsAdapter extends RecyclerListView.SectionsAdapter {
                         return SHADOW_CELL;
                     }
                     if (position == 3) {
-                        return isEmpty ? SHADOW_CELL : GRAY_CELL;
+                        return isEmpty ? SHADOW_CELL : (sortType == SORT_TYPE_BY_NAME || sortType == SORT_TYPE_BY_TIME ? HEADER_CELL : GRAY_CELL);
                     }
                 } else {
                     if (position == 2) {

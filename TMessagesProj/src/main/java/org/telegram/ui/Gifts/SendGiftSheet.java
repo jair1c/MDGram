@@ -98,6 +98,9 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.List;
 
+import uz.unnarsx.cherrygram.core.configs.CherrygramDebugConfig;
+import uz.unnarsx.cherrygram.core.configs.CherrygramFirebaseConfig;
+
 public class SendGiftSheet extends BottomSheetWithRecyclerListView implements NotificationCenter.NotificationCenterDelegate, GiftAuctionController.OnAuctionUpdateListener {
 
     private final boolean self;
@@ -366,7 +369,7 @@ public class SendGiftSheet extends BottomSheetWithRecyclerListView implements No
 
             }
         };
-        messageEdit.editTextEmoji.getEditText().addTextChangedListener(new EditTextSuggestionsFix());
+        if (CherrygramDebugConfig.INSTANCE.getEditTextSuggestionsFix()) messageEdit.editTextEmoji.getEditText().addTextChangedListener(new EditTextSuggestionsFix());
         messageEdit.editTextEmoji.allowEmojisForNonPremium(true);
         messageEdit.setShowLimitWhenNear(50);
         setEditTextEmoji(messageEdit.editTextEmoji);
@@ -507,6 +510,14 @@ public class SendGiftSheet extends BottomSheetWithRecyclerListView implements No
                 messageEdit.editTextEmoji.closeKeyboard();
             }
             if (starGift != null) {
+
+                if (CherrygramFirebaseConfig.INSTANCE.getAllowSafeStars()) {
+                    if (closeParentSheet != null) {
+                        closeParentSheet.run();
+                    }
+                    dismiss();
+                }
+
                 buyStarGift();
             } else {
                 buyPremiumTier();

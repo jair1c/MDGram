@@ -185,7 +185,7 @@ public class AboutMDGramActivity extends UniversalFragment {
 
         content.addView(creditsBullet(context, "Agradecimientos especiales a TELEGRAM org."), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 6, 0));
         content.addView(creditsBullet(context, "NekoX-Dev/NekoX — código base del proyecto (GPL)"), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 6, 0));
-        content.addView(creditsBullet(context, "Cherrygram — funciones de Conversación y General portadas (GPL)"), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 6, 0));
+        content.addView(creditsBullet(context, "MDGram — funciones de Conversación y General portadas (GPL; crédito a Cherrygram)"), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 6, 0));
         content.addView(creditsBullet(context, "OwlGram — base del traductor de mensajes (GPL)"), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 6, 0));
         content.addView(creditsBullet(context, "OctoGram — referencia de mods y traductor (GPL)"), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 6, 0));
         content.addView(creditsBullet(context, "MDGram original de Richar Correa (inspiración y diseño de referencia)"), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 20, 0));

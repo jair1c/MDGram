@@ -10,6 +10,7 @@ import android.graphics.Canvas;
 import android.graphics.PorterDuff;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 
@@ -17,13 +18,18 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RawRes;
+import androidx.core.graphics.ColorUtils;
 
+import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.utils.ViewOutlineProviderImpl;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
 import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
+import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundColorProvider;
 import org.telegram.ui.Components.blur3.drawable.color.BlurredBackgroundColorProviderThemed;
 import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceColor;
+import org.telegram.ui.DialogsActivity;
 
 import java.util.ArrayList;
 
@@ -32,6 +38,15 @@ import me.vkryl.android.animator.FactorAnimator;
 
 @SuppressLint("ViewConstructor")
 public class FragmentFloatingButton extends FrameLayout implements FactorAnimator.Target {
+    private boolean roundedSquare;
+
+    public void setRoundedSquare(boolean roundedSquare) {
+        this.roundedSquare = roundedSquare;
+        if (!isSubButton) {
+            setOutlineProvider(roundedSquare ? ViewOutlineProvider.BACKGROUND : ViewOutlineProviderImpl.BOUNDS_OVAL);
+            updateColors();
+        }
+    }
     private final int ANIMATOR_ID_BUTTON_VISIBLE = 0;
     private final int ANIMATOR_ID_PROGRESS_VISIBLE = 1;
 
@@ -47,7 +62,6 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
     private final Theme.ResourcesProvider resourcesProvider;
     private ArrayList<View> additionalContentViews;
     private final boolean isSubButton;
-    private boolean useRoundedShape;
 
     public FragmentFloatingButton(@NonNull Context context, Theme.ResourcesProvider resourcesProvider) {
         this(context, resourcesProvider, false);
@@ -100,17 +114,6 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
             iBlur3Background.setPadding(dp(5.66f));
         }
 
-        updateColors();
-    }
-
-    public void setUseRoundedShape(boolean rounded) {
-        if (useRoundedShape == rounded) {
-            return;
-        }
-        useRoundedShape = rounded;
-        if (!isSubButton) {
-            setOutlineProvider(rounded ? ViewOutlineProviderImpl.boundsWithPaddingRoundRect(0, dp(16)) : ViewOutlineProviderImpl.BOUNDS_OVAL);
-        }
         updateColors();
     }
 
@@ -175,17 +178,11 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
         } else {
             imageView.setColorFilter(Theme.getColor(Theme.key_chats_actionIcon, resourcesProvider), PorterDuff.Mode.SRC_IN);
             progressView.setProgressColor(Theme.getColor(Theme.key_chats_actionIcon, resourcesProvider));
-            if (useRoundedShape) {
-                setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(16),
-                    Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider),
-                    Theme.getColor(Theme.key_featuredStickers_addButtonPressed, resourcesProvider)
-                ));
-            } else {
-                setBackground(Theme.createSimpleSelectorCircleDrawable(dp(48),
-                    Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider),
-                    Theme.getColor(Theme.key_featuredStickers_addButtonPressed, resourcesProvider)
-                ));
-            }
+            int normalColor = Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider);
+            int pressedColor = Theme.getColor(Theme.key_featuredStickers_addButtonPressed, resourcesProvider);
+            setBackground(roundedSquare
+                ? Theme.createSimpleSelectorRoundRectDrawable(dp(16), normalColor, pressedColor)
+                : Theme.createSimpleSelectorCircleDrawable(dp(48), normalColor, pressedColor));
         }
     }
 
@@ -212,10 +209,13 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
 
     private float additionalTranslationY;
     private float internalTranslationY;
+    private boolean setTranslationInternal;
 
     private void setAdditionalTranslationY(float translationY) {
         if (additionalTranslationY != translationY) {
+            setTranslationInternal = true;
             super.setTranslationY(internalTranslationY + translationY);
+            setTranslationInternal = false;
             additionalTranslationY = translationY;
         }
     }
@@ -239,13 +239,19 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
     @Override
     public void setTranslationY(float translationY) {
         if (internalTranslationY != translationY) {
+            setTranslationInternal = true;
             super.setTranslationY(translationY + additionalTranslationY);
+            setTranslationInternal = false;
             internalTranslationY = translationY;
         }
     }
 
     @Override
     public float getTranslationY() {
+        if (setTranslationInternal) {
+            return super.getTranslationY();
+        }
+
         return internalTranslationY;
     }
 

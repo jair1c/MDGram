@@ -5,6 +5,9 @@ import static android.view.View.INVISIBLE;
 import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
+import static org.telegram.messenger.AndroidUtilities.dp;
+import static org.telegram.messenger.LocaleController.getString;
+
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
@@ -65,8 +68,10 @@ import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.Bulletin;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.FlickerLoadingView;
+import org.telegram.ui.Components.ItemOptions;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.ProfileGalleryView;
 import org.telegram.ui.Components.RecyclerListView;
@@ -129,7 +134,7 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
     public FrameLayout getRootLayout() {
         if (rootLayout == null) {
             rootLayout = new FrameLayout(fragment.getParentActivity());
-            rootLayout.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite, fragment.getResourceProvider()));
+            rootLayout.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, fragment.getResourceProvider()));
 
             loadingView = getLoadingView();
             rootLayout.addView(loadingView, MATCH_PARENT, MATCH_PARENT);
@@ -143,6 +148,7 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
             LinearLayoutManager layoutManager = new LinearLayoutManager(fragment.getParentActivity());
             recyclerView = new RecyclerListView(fragment.getParentActivity());
             recyclerView.setAdapter(adapter);
+            recyclerView.setSections();
             recyclerView.setLayoutManager(layoutManager);
             recyclerView.setOnItemClickListener(this::onItemClick);
             recyclerView.setOnScrollListener(listScrollListener);
@@ -157,6 +163,10 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
             recyclerView.setItemAnimator(itemAnimator);
         }
         return rootLayout;
+    }
+
+    public RecyclerListView getRecyclerView() {
+        return recyclerView;
     }
 
     public void setShowLastItemDivider(boolean showLastItemDivider) {
@@ -184,8 +194,8 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
     public StickerEmptyView getEmptyView() {
         if (emptyView == null) {
             emptyView = new StickerEmptyView(fragment.getParentActivity(), null, StickerEmptyView.STICKER_TYPE_DONE, fragment.getResourceProvider());
-            emptyView.title.setText(isChannel ? LocaleController.getString(R.string.NoSubscribeRequests) : LocaleController.getString(R.string.NoMemberRequests));
-            emptyView.subtitle.setText(isChannel ? LocaleController.getString(R.string.NoSubscribeRequestsDescription) : LocaleController.getString(R.string.NoMemberRequestsDescription));
+            emptyView.title.setText(isChannel ? getString(R.string.NoSubscribeRequests) : getString(R.string.NoMemberRequests));
+            emptyView.subtitle.setText(isChannel ? getString(R.string.NoSubscribeRequestsDescription) : getString(R.string.NoMemberRequestsDescription));
             emptyView.setAnimateLayoutChange(true);
             emptyView.setVisibility(GONE);
         }
@@ -198,8 +208,8 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
             if (isShowLastItemDivider) {
                 searchEmptyView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite, fragment.getResourceProvider()));
             }
-            searchEmptyView.title.setText(LocaleController.getString(R.string.NoResult));
-            searchEmptyView.subtitle.setText(LocaleController.getString(R.string.SearchEmptyViewFilteredSubtitle2));
+            searchEmptyView.title.setText(getString(R.string.NoResult));
+            searchEmptyView.subtitle.setText(getString(R.string.SearchEmptyViewFilteredSubtitle2));
             searchEmptyView.setAnimateLayoutChange(true);
             searchEmptyView.setVisibility(GONE);
         }
@@ -238,7 +248,7 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
             MemberRequestCell cell = (MemberRequestCell) view;
             AndroidUtilities.runOnUIThread(() -> {
                 importer = cell.getImporter();
-                TLRPC.User user = users.get(importer.user_id);
+                /*TLRPC.User user = users.get(importer.user_id);
                 if (user == null) {
                     return;
                 }
@@ -259,7 +269,63 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
                     previewDialog.setImporter(importer, cell.getAvatarImageView());
                     previewDialog.setOnDismissListener(dialog -> previewDialog = null);
                     previewDialog.show();
+                }*/
+
+                var getMessagesController = MessagesController.getInstance(currentAccount);
+
+                TLRPC.User currentUser = getMessagesController.getUser(importer.user_id);
+                final TLRPC.UserFull userFull = getMessagesController.getUserFull(importer.user_id);
+                if (userFull == null) {
+                    getMessagesController.loadUserInfo(currentUser, false, 0);
                 }
+                TLRPC.Chat currentChat = getMessagesController.getChat(chatId);
+                if (currentChat == null) {
+                    getMessagesController.loadFullChat(chatId, 0, true);
+                }
+                TLRPC.User user = users.get(importer.user_id);
+                RecyclerListView parentListView = (RecyclerListView) cell.getParent();
+                ItemOptions.makeOptions(cell, fragment.getResourceProvider(), parentListView)
+                        .add(R.drawable.msg_requests, isChannel ? getString(R.string.AddToChannel) : getString(R.string.AddToGroup), () -> {
+                            if (importer != null) {
+                                fragment.dismissCurrentDialog();
+                                onAddClicked(importer);
+                            }
+                        })
+                        .add(R.drawable.msg_remove, getString(R.string.DismissRequest), true, () -> {
+                            if (importer != null) {
+                                fragment.dismissCurrentDialog();
+                                onDismissClicked(importer);
+                            }
+                        })
+                        .addIf(ChatObject.canBlockUsers(currentChat), R.drawable.msg_remove, isChannel ? getString(R.string.ChannelRemoveUser) : getString(R.string.KickFromGroup), true, () -> {
+                            getMessagesController.deleteParticipantFromChat(chatId, user);
+                            if (importer != null) {
+                                fragment.dismissCurrentDialog();
+                                onDismissClicked(importer);
+                            }
+                            if (currentChat != null && user != null && BulletinFactory.canShowBulletin(fragment)) {
+                                BulletinFactory.createRemoveFromChatBulletin(fragment, user, currentChat.title).show();
+                            }
+                        })
+                        .addSpaceGap()
+                        /*.add(R.drawable.msg_discussion, getString(R.string.SendMessage), () -> {
+                            fragment.dismissCurrentDialog();
+
+                            Bundle args = new Bundle();
+                            args.putLong("user_id", importer.user_id);
+                            ChatActivity chatActivity = new ChatActivity(args);
+                            fragment.presentFragment(chatActivity);
+                        })
+                        .addGap()*/
+                        .addProfile(user, getString(R.string.ViewProfile), () -> {
+                            fragment.dismissCurrentDialog();
+                            fragment.presentFragment(ProfileActivity.of(user.id));
+                        })
+                        .setDrawScrim(false)
+                        .setGravity(Gravity.CENTER)
+                        .forceBottom(false)
+                        .translate(0, dp(100))
+                        .show();
             }, isSearchExpanded ? 100 : 0);
         }
     }
@@ -495,7 +561,7 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
                     onImportersChanged(query, false, true);
                     if (isApproved) {
                         Bulletin.MultiLineLayout layout = new Bulletin.MultiLineLayout(fragment.getParentActivity(), fragment.getResourceProvider());
-                        layout.imageView.setRoundRadius(AndroidUtilities.dp(15));
+                        layout.imageView.setRoundRadius(dp(15));
                         layout.imageView.setForUserOrChat(user, new AvatarDrawable(user));
                         String userName = UserObject.getFirstName(user);
                         String message = isChannel
@@ -577,20 +643,19 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
                 default:
                 case 0:
                     MemberRequestCell cell = new MemberRequestCell(parent.getContext(), MemberRequestsDelegate.this, isChannel);
-                    cell.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite, fragment.getResourceProvider()));
                     view = cell;
                     break;
                 case 1:
                     view = new View(parent.getContext());
-                    view.setBackground(Theme.getThemedDrawableByKey(parent.getContext(), R.drawable.greydivider_bottom, Theme.key_windowBackgroundGrayShadow));
                     break;
                 case 2:
                     view = new View(parent.getContext()) {
                         @Override
                         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-                            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(52), MeasureSpec.EXACTLY));
+                            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(dp(52), MeasureSpec.EXACTLY));
                         }
                     };
+                    view.setTag(RecyclerListView.TAG_NOT_SECTION);
                     break;
                 case 3:
                     view = new View(parent.getContext());
@@ -601,7 +666,7 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
                         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
                             setMeasuredDimension(
                                     MeasureSpec.getSize(widthMeasureSpec),
-                                    AndroidUtilities.dp(2 * 52)
+                                    dp(2 * 52)
                             );
                         }
                     };
@@ -613,6 +678,7 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
                     loadingView.setMemberRequestButton(isChannel);
                     loadingView.setIsSingleCell(true);
                     loadingView.setItemsCount(1);
+                    loadingView.setTag(RecyclerListView.TAG_NOT_SECTION);
                     view = loadingView;
                     break;
             }
@@ -851,8 +917,8 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
             final ImageLocation imageLocation;
             final ImageLocation thumbLocation;
             TLRPC.User currentUser = MessagesController.getInstance(currentAccount).getUser(importer.user_id);
-            imageLocation = ImageLocation.getForUserOrChat(currentUser, ImageLocation.TYPE_BIG);
-            thumbLocation = ImageLocation.getForUserOrChat(currentUser, ImageLocation.TYPE_SMALL);
+            imageLocation = ImageLocation.getForUserOrChat(currentAccount, currentUser, ImageLocation.TYPE_BIG);
+            thumbLocation = ImageLocation.getForUserOrChat(currentAccount, currentUser, ImageLocation.TYPE_SMALL);
             final TLRPC.UserFull userFull = MessagesController.getInstance(currentAccount).getUserFull(importer.user_id);
             if (userFull == null) {
                 MessagesController.getInstance(currentAccount).loadUserInfo(currentUser, false, 0);
@@ -972,11 +1038,11 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
 
         private int getContentHeight() {
             int height = viewPager.getMeasuredHeight();
-            height += AndroidUtilities.dp(12) + nameText.getMeasuredHeight();
+            height += dp(12) + nameText.getMeasuredHeight();
             if (bioText.getVisibility() != GONE) {
-                height += AndroidUtilities.dp(4) + bioText.getMeasuredHeight();
+                height += dp(4) + bioText.getMeasuredHeight();
             }
-            height += AndroidUtilities.dp(12) + popupLayout.getMeasuredHeight();
+            height += dp(12) + popupLayout.getMeasuredHeight();
             return height;
         }
 
@@ -1017,11 +1083,11 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
                 setWillNotDraw(false);
                 super.onMeasure(widthMeasureSpec, heightMeasureSpec);
                 int minSize = Math.min(getMeasuredWidth(), getMeasuredHeight());
-                int pagerSize = Math.min(minSize, (int)(getMeasuredHeight() * 0.66)) - AndroidUtilities.dp(12) * 2;
+                int pagerSize = Math.min(minSize, (int)(getMeasuredHeight() * 0.66)) - dp(12) * 2;
                 int pagerSpec = MeasureSpec.makeMeasureSpec(pagerSize, MeasureSpec.AT_MOST);
                 viewPager.measure(pagerSpec, pagerSpec);
                 pagerIndicator.measure(pagerSpec, pagerSpec);
-                int textWidthSpec = MeasureSpec.makeMeasureSpec(pagerSize - AndroidUtilities.dp(16) * 2, MeasureSpec.EXACTLY);
+                int textWidthSpec = MeasureSpec.makeMeasureSpec(pagerSize - dp(16) * 2, MeasureSpec.EXACTLY);
                 nameText.measure(textWidthSpec, MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
                 bioText.measure(textWidthSpec, MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
                 popupLayout.measure(View.MeasureSpec.makeMeasureSpec(viewPager.getMeasuredWidth() + shadowPaddingLeft * 2, MeasureSpec.AT_MOST), View.MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
@@ -1033,15 +1099,15 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
                 int left = (getWidth() - viewPager.getMeasuredWidth()) / 2;
                 viewPager.layout(left, top, left + viewPager.getMeasuredWidth(), top + viewPager.getMeasuredHeight());
                 pagerIndicator.layout(viewPager.getLeft(), viewPager.getTop(), viewPager.getRight(), viewPager.getTop() + pagerIndicator.getMeasuredHeight());
-                top += viewPager.getMeasuredHeight() + AndroidUtilities.dp(12);
-                nameText.layout(viewPager.getLeft() + AndroidUtilities.dp(16), top, viewPager.getRight() - AndroidUtilities.dp(16), top + nameText.getMeasuredHeight());
+                top += viewPager.getMeasuredHeight() + dp(12);
+                nameText.layout(viewPager.getLeft() + dp(16), top, viewPager.getRight() - dp(16), top + nameText.getMeasuredHeight());
                 top += nameText.getMeasuredHeight();
                 if (bioText.getVisibility() != GONE) {
-                    top += AndroidUtilities.dp(4);
+                    top += dp(4);
                     bioText.layout(nameText.getLeft(), top, nameText.getRight(), top + bioText.getMeasuredHeight());
                     top += bioText.getMeasuredHeight();
                 }
-                top += AndroidUtilities.dp(12);
+                top += dp(12);
                 pagerShadowDrawable.setBounds(
                         viewPager.getLeft() - shadowPaddingLeft,
                         viewPager.getTop() - shadowPaddingTop,
@@ -1053,7 +1119,7 @@ public class MemberRequestsDelegate implements MemberRequestCell.OnClickListener
                 popupLayout.layout(left, top, viewPager.getRight() + shadowPaddingLeft, top + popupLayout.getMeasuredHeight());
                 popupLayout.setVisibility(popupLayout.getBottom() < b ? VISIBLE : GONE);
 
-                int radius = AndroidUtilities.dp(6);
+                int radius = dp(6);
                 rectF.set(viewPager.getLeft(), viewPager.getTop(), viewPager.getRight(), viewPager.getTop() + radius * 2);
                 clipPath.reset();
                 clipPath.addRoundRect(rectF, radius, radius, Path.Direction.CW);

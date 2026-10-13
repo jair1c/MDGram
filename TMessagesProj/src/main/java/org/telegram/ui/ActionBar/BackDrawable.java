@@ -8,17 +8,23 @@
 
 package org.telegram.ui.ActionBar;
 
+import android.animation.ValueAnimator;
+import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
+import android.provider.Settings;
 import android.view.animation.DecelerateInterpolator;
 
+import androidx.annotation.NonNull;
 import androidx.core.graphics.ColorUtils;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.Utilities;
 
 public class BackDrawable extends Drawable {
@@ -98,12 +104,12 @@ public class BackDrawable extends Drawable {
     }
 
     @Override
-    public void draw(Canvas canvas) {
+    public void draw(@NonNull Canvas canvas) {
         if (currentRotation != finalRotation) {
             if (lastFrameTime != 0) {
                 long dt = System.currentTimeMillis() - lastFrameTime;
 
-                currentAnimationTime += dt;
+                currentAnimationTime += (int) dt;
                 if (currentAnimationTime >= animationTime) {
                     currentRotation = finalRotation;
                 } else {
@@ -121,18 +127,63 @@ public class BackDrawable extends Drawable {
         paint.setColor(ColorUtils.blendARGB(color, rotatedColor, currentRotation));
 
         canvas.save();
-        canvas.translate(getIntrinsicWidth() / 2, getIntrinsicHeight() / 2);
+
+        if (moveBackProgress != finalMoveBackProgress) {
+            if (moveBackLastFrameTime != 0) {
+                float durationScale = getAnimatorDurationScale(ApplicationLoader.applicationContext);
+
+                if (durationScale <= 0f) {
+                    moveBackProgress = finalMoveBackProgress;
+                } else {
+                    long dt = System.currentTimeMillis() - moveBackLastFrameTime;
+
+                    moveBackAnimationTime += (int) (dt / durationScale);
+
+                    if (moveBackAnimationTime >= moveBackDuration) {
+                        moveBackProgress = finalMoveBackProgress;
+                    } else {
+                        float t = interpolator.getInterpolation((float) moveBackAnimationTime / moveBackDuration);
+
+                        if (finalMoveBackProgress == 1f) {
+                            moveBackProgress = t;
+                        } else {
+                            moveBackProgress = 1f - t;
+                        }
+                    }
+                }
+            }
+
+            moveBackLastFrameTime = System.currentTimeMillis();
+            invalidateSelf();
+        }
+
+        float baseOffset = !showStick ? AndroidUtilities.dp(3.5f) * (1.0f - currentRotation) : 0;
+        float signedOffset = AndroidUtilities.lerp(baseOffset, -baseOffset, moveBackProgress);
+
+        canvas.translate(
+                getIntrinsicWidth() / 2f + signedOffset,
+                getIntrinsicHeight() / 2f
+        );
         if (arrowRotation != 0) {
             canvas.rotate(arrowRotation);
         }
         float rotation = currentRotation;
+        canvas.translate(-AndroidUtilities.dp(0.66f)/* * (rotation)*/, 0);
         if (!alwaysClose) {
             canvas.rotate(currentRotation * (reverseAngle ? -225 : 135));
         } else {
             canvas.rotate(135 + currentRotation * (reverseAngle ? -180 : 180));
             rotation = 1.0f;
         }
-        canvas.drawLine(AndroidUtilities.dp(AndroidUtilities.lerp(-6.75f, -8f, rotation)), 0, AndroidUtilities.dp(8) - (paint.getStrokeWidth() / 2f) * (1f - rotation), 0, paint);
+
+        float startX = AndroidUtilities.dp(AndroidUtilities.lerp(-6.75f, -8f, rotation));
+        float defaultEndX = AndroidUtilities.dp(8) - (paint.getStrokeWidth() / 2f) * (1f - rotation);
+
+        float stickFactor = showStick ? 1.0f : rotation;
+        float endX = AndroidUtilities.lerp(startX, defaultEndX, stickFactor);
+
+        canvas.drawLine(startX, 0, endX, 0, paint);
+
         float startYDiff = AndroidUtilities.dp(-0.25f);
         float endYDiff = AndroidUtilities.dp(AndroidUtilities.lerp(7f, 8f, rotation)) - (paint.getStrokeWidth() / 4f) * (1f - rotation);
         float startXDiff = AndroidUtilities.dp(AndroidUtilities.lerp(-7f - 0.25f, 0f, rotation));
@@ -166,4 +217,64 @@ public class BackDrawable extends Drawable {
     public int getIntrinsicHeight() {
         return AndroidUtilities.dp(24);
     }
+
+    /** Cherrygram start */
+    private boolean showStick = true;
+
+    private float moveBackProgress = 1f;
+    private float finalMoveBackProgress = 1f;
+    private long moveBackLastFrameTime;
+    private int moveBackAnimationTime;
+
+    private final float moveBackDuration = 220f;
+
+    public void setShowStick(boolean show) {
+        show = false;
+        if (showStick != show) {
+            showStick = show;
+            invalidateSelf();
+        }
+        setMoveBackIcon(false);
+    }
+
+    public boolean isShowStick() {
+        return showStick;
+    }
+
+    public void setMoveBackIcon(boolean moveBackIcon) {
+        float target = moveBackIcon ? 1f : 0f;
+
+        if (finalMoveBackProgress == target) {
+            return;
+        }
+
+        finalMoveBackProgress = target;
+
+        if (moveBackProgress < target) {
+            moveBackAnimationTime = (int) (moveBackProgress * moveBackDuration);
+        } else {
+            moveBackAnimationTime = (int) ((1f - moveBackProgress) * moveBackDuration);
+        }
+
+        moveBackLastFrameTime = System.currentTimeMillis();
+        invalidateSelf();
+    }
+
+    public static float getAnimatorDurationScale(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return ValueAnimator.getDurationScale();
+        }
+
+        try {
+            return Settings.Global.getFloat(
+                    context.getContentResolver(),
+                    Settings.Global.ANIMATOR_DURATION_SCALE,
+                    1.0f
+            );
+        } catch (Throwable e) {
+            return 1.0f;
+        }
+    }
+    /** Cherrygram finish */
+
 }

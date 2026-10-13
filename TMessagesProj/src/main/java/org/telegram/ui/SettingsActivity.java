@@ -34,17 +34,18 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.InsetDrawable;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.Layout;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MotionEvent;
-import android.view.VelocityTracker;
-import android.view.ViewGroup;
 import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.WebStorage;
 import android.webkit.WebView;
@@ -58,9 +59,13 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.collection.LongSparseArray;
+import androidx.core.graphics.ColorUtils;
+import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.common.collect.Lists;
 
 import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AndroidUtilities;
@@ -76,14 +81,14 @@ import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
-import org.telegram.messenger.MessageObject;
+import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
+import org.telegram.messenger.SharedPrefsHelper;
 import org.telegram.messenger.UserConfig;
-import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.tgnet.ConnectionsManager;
@@ -93,6 +98,7 @@ import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.SettingsSearchCell;
@@ -101,9 +107,12 @@ import org.telegram.ui.Components.AnimatedEmojiDrawable;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.BulletinFactory;
+import org.telegram.ui.Components.ChatAvatarContainer;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.FloatingDebug.FloatingDebugController;
 import org.telegram.ui.Components.FragmentFloatingButton;
+import org.telegram.ui.Components.HintsController;
+import org.telegram.ui.Components.IconBackgroundColors;
 import org.telegram.ui.Components.ImageUpdater;
 import org.telegram.ui.Components.InstantCameraView;
 import org.telegram.ui.Components.ItemOptions;
@@ -133,16 +142,28 @@ import org.telegram.ui.TON.TONIntroActivity;
 import org.telegram.ui.bots.BotBiometry;
 import org.telegram.ui.bots.BotDownloads;
 import org.telegram.ui.bots.BotLocation;
+import org.telegram.ui.bots.BotWebViewSheet;
 import org.telegram.ui.bots.SetupEmojiStatusSheet;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
 import me.vkryl.android.animator.BoolAnimator;
 import me.vkryl.android.animator.FactorAnimator;
+import uz.unnarsx.cherrygram.core.configs.CherrygramAppearanceConfig;
+import uz.unnarsx.cherrygram.core.ui.CGBulletinCreator;
+import uz.unnarsx.cherrygram.donates.BadgeHelper;
+import uz.unnarsx.cherrygram.donates.DonatesManager;
+import uz.unnarsx.cherrygram.donates.StarsBadgeDrawable;
+import uz.unnarsx.cherrygram.helpers.ui.MonetHelper;
+import uz.unnarsx.cherrygram.misc.Constants;
+import uz.unnarsx.cherrygram.preferences.CherrygramPreferencesNavigator;
+import uz.unnarsx.cherrygram.preferences.helpers.TelegramSettingsHelper;
 
 public class SettingsActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate, ImageUpdater.ImageUpdaterDelegate, MainTabsActivity.TabFragmentDelegate, FactorAnimator.Target {
 
@@ -155,7 +176,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     private UniversalRecyclerView listView;
     private View actionBarBackground;
 
-    private ActionBarMenuItem searchItem, otherItem;
+    public ActionBarMenuItem searchItem, otherItem;
     private String query;
     private ProfileActivity.SearchAdapter search;
 
@@ -166,7 +187,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     private TLRPC.FileLocation avatarBig;
     private ImageLocation uploadingImageLocation;
 
-    private static final int HEADER_HEIGHT_DP = 200 - 12;
     private FrameLayout topView;
     private FrameLayout avatarContainer;
     private AvatarDrawable avatarDrawable;
@@ -176,26 +196,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     private ImageView cameraImageView;
     private TextView titleView;
     private TextView subtitleView;
+    private ChatAvatarContainer compactProfileHeader;
     private TextView versionView;
-    private boolean hasMainTabs;
-
-    // Fase 2 — jalar para expandir (pull-to-expand). Mecanismo del gesto (rebote elástico,
-    // umbral de expansión, apertura de foto en jalón fuerte) inspirado en el real de
-    // ProfileActivity, pero manejado con el delta táctil directo en vez de
-    // LinearLayoutManager.scrollVerticallyBy: se comprobó en el dispositivo real que el
-    // LinearLayoutManager estándar de Android no permite mover el contenido más allá del
-    // inicio de la lista (consume ~unos pocos px de holgura y luego se congela en 0 sin
-    // importar el dy solicitado), así que el crecimiento del banner se controla aquí
-    // directamente sobre topView/avatarContainer (vistas hermanas de la lista), no vía scroll.
-    private float extraHeight;
-    private boolean isPulledDown;
-    private boolean openingAvatar;
-    private float listViewVelocityY;
-    private boolean headerExpandedLayoutApplied;
-    private boolean bigAvatarLoaded;
-    private boolean headerIconsWhite;
-    private ValueAnimator pullReleaseAnimator;
-    private PhotoViewer.PhotoViewerProvider avatarPhotoViewerProvider;
+    public boolean hasMainTabs;
 
     private View navigationBar;
 
@@ -228,6 +231,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         if (arguments != null) {
             hasMainTabs = arguments.getBoolean("hasMainTabs", false);
         }
+
+        telegramSettingsHelper = new TelegramSettingsHelper(SettingsActivity.this);
+        telegramSettingsHelper.checkChannelSubscription();
 
         additionNavigationBarHeight = hasMainTabs ? dp(DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS) : 0;
         return super.onFragmentCreate();
@@ -306,14 +312,14 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
         actionBar.setAllowOverlayTitle(true);
         actionBar.setUseContainerForTitles();
-        actionBar.setTitle("Ajustes"); // MDGram: título en español (R.string.Settings sale "Settings")
+        actionBar.setTitle("", null, true);
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
                 if (id == -1) {
                     finishFragment();
                 } else if (id == 2) {
-                    presentFragment(new LogoutActivity());
+                    presentSettingFragment(new LogoutActivity());
                 }
             }
         });
@@ -328,9 +334,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             @Override
             public void onSearchCollapse() {
                 animatorSearchPageVisible.setValue(false, true);
-                if (topView != null) {
-                    topView.setVisibility(View.VISIBLE);
-                }
                 updateActionBarVisible();
                 listView.adapter.update(false);
             }
@@ -339,9 +342,6 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             public void onSearchExpand() {
                 animatorSearchPageVisible.setValue(true, true);
                 search.search(query = "");
-                if (topView != null) {
-                    topView.setVisibility(View.GONE);
-                }
                 updateActionBarVisible();
                 listView.adapter.update(false);
             }
@@ -354,7 +354,19 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         searchItem.setSearchFieldHint(getString(R.string.Search));
 
         otherItem = menu.addItem(1, R.drawable.ic_ab_other);
+        otherItem.setContentDescription(getString(R.string.AccDescrMoreOptions));
+        otherItem.setOnClickListener(view -> telegramSettingsHelper.showItemOptions(otherItem));
         otherItem.addSubItem(2, R.drawable.msg_leave, getString(R.string.LogOut));
+
+        compactProfileHeader = new ChatAvatarContainer(context, this, false, resourceProvider);
+        compactProfileHeader.setOccupyStatusBar(false);
+        compactProfileHeader.setLeftPadding(dp(8));
+        compactProfileHeader.allowDrawStories = false;
+        FrameLayout.LayoutParams compactHeaderLayout = LayoutHelper.createFrame(
+                LayoutHelper.MATCH_PARENT, ActionBar.getCurrentActionBarHeight(),
+                Gravity.TOP | Gravity.LEFT, 56, 0, 108, 0);
+        compactHeaderLayout.topMargin = AndroidUtilities.statusBarHeight;
+        actionBar.addView(compactProfileHeader, 0, compactHeaderLayout);
 
         search = new ProfileActivity.SearchAdapter(this, context) {
             @Override
@@ -364,76 +376,15 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         };
         search.loadFaqWebPage();
 
-        listView = new UniversalRecyclerView(this, this::fillItems, this::onClick, this::onLongClick) {
-            private VelocityTracker velocityTracker;
-            private float lastTouchY;
-            private boolean pulling;
-
-            @Override
-            public boolean onTouchEvent(MotionEvent e) {
-                final int action = e.getAction();
-                if (action == MotionEvent.ACTION_DOWN) {
-                    lastTouchY = e.getRawY();
-                    pulling = false;
-                    if (velocityTracker == null) {
-                        velocityTracker = VelocityTracker.obtain();
-                    } else {
-                        velocityTracker.clear();
-                    }
-                    velocityTracker.addMovement(e);
-                    return super.onTouchEvent(e);
-                } else if (action == MotionEvent.ACTION_MOVE) {
-                    if (velocityTracker != null) {
-                        velocityTracker.addMovement(e);
-                        velocityTracker.computeCurrentVelocity(1000);
-                        listViewVelocityY = velocityTracker.getYVelocity(e.getPointerId(e.getActionIndex()));
-                    }
-                    final float y = e.getRawY();
-                    final float rawDelta = y - lastTouchY;
-                    lastTouchY = y;
-                    if (extraHeight > 0 || (rawDelta > 0 && !canScrollVertically(-1))) {
-                        pulling = true;
-                        final float rubberDelta = isPulledDown ? rawDelta : rawDelta / 2f;
-                        extraHeight = Math.max(0f, extraHeight + rubberDelta);
-                        cancelPullReleaseAnimator();
-                        updateHeaderPullDown();
-                        final float fullExtraHeight = getMeasuredWidth();
-                        if (!openingAvatar && fullExtraHeight > 0 && extraHeight >= fullExtraHeight - 1) {
-                            openAvatarPhoto(true);
-                        }
-                        return true;
-                    }
-                    return super.onTouchEvent(e);
-                } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                    if (velocityTracker != null) {
-                        if (action == MotionEvent.ACTION_UP) {
-                            velocityTracker.addMovement(e);
-                            velocityTracker.computeCurrentVelocity(1000);
-                            listViewVelocityY = velocityTracker.getYVelocity(e.getPointerId(e.getActionIndex()));
-                        }
-                        velocityTracker.recycle();
-                        velocityTracker = null;
-                    }
-                    final boolean wasPulling = pulling;
-                    pulling = false;
-                    final boolean result = wasPulling || super.onTouchEvent(e);
-                    if (extraHeight > 0) {
-                        animatePullRelease();
-                    }
-                    return result;
-                }
-                return super.onTouchEvent(e);
-            }
-        };
+        listView = new UniversalRecyclerView(this, this::fillItems, this::onClick, this::onLongClick);
         listView.adapter.setApplyBackground(false);
         listView.setSections();
-        listView.setPadding(0, AndroidUtilities.statusBarHeight + dp(12) + dp(HEADER_HEIGHT_DP), 0, AndroidUtilities.navigationBarHeight + additionNavigationBarHeight);
+        listView.setPadding(0, AndroidUtilities.statusBarHeight + ActionBar.getCurrentActionBarHeight(), 0, AndroidUtilities.navigationBarHeight + additionNavigationBarHeight);
         listView.setClipToPadding(false);
         listView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
                 updateActionBarVisible();
-                updateHeaderCollapseProgress();
                 if (listView.scrollingByUser) {
                     AndroidUtilities.hideKeyboard(fragmentView);
                 }
@@ -443,6 +394,27 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                     blur3_InvalidateBlur();
                 }
             }
+        });
+        listView.allowReorder(accountNumbers != null && accountNumbers.size() > 1);
+        listView.listenReorder((id, newItems) -> {
+            ArrayList<Integer> newOrder = new ArrayList<>();
+
+            for (UItem item : newItems) {
+                if (item.object instanceof Integer) {
+                    newOrder.add((Integer) item.object);
+                }
+            }
+
+            if (newOrder.size() != accountNumbers.size()) return;
+
+            for (int i = 0; i < newOrder.size(); i++) {
+                UserConfig config = UserConfig.getInstance(newOrder.get(i));
+                config.loginTime = i;
+                config.saveConfig(false);
+            }
+
+            accountNumbers.clear();
+            accountNumbers.addAll(newOrder);
         });
         iBlur3Capture = new ViewGroupPartRenderer(listView, contentView, listView::drawChild);
         listView.addEdgeEffectListener(() -> listView.postOnAnimation(this::blur3_InvalidateBlur));
@@ -473,7 +445,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         avatarContainer = new FrameLayout(context);
         topView.addView(avatarContainer, LayoutHelper.createFrame(120, 120, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 23 - 12, 0, 0));
-        avatarContainer.setOnClickListener(v -> {
+        /*avatarContainer.setOnClickListener(v -> {
             TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(UserConfig.getInstance(currentAccount).getClientUserId());
             if (user == null) {
                 user = UserConfig.getInstance(currentAccount).getCurrentUser();
@@ -487,7 +459,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
             }, 0);
         });
-        ScaleStateListAnimator.apply(avatarContainer);
+        ScaleStateListAnimator.apply(avatarContainer);*/
 
         avatarDrawable = new AvatarDrawable();
         avatarView = new BackupImageView(context);
@@ -535,21 +507,23 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         titleView.setGravity(Gravity.CENTER);
         titleView.setSingleLine();
         titleView.setEllipsize(TextUtils.TruncateAt.END);
-        topView.addView(titleView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 138.333f - 12, 0, 0));
+        topView.addView(titleView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 16, 138.333f - 12, 16, 0));
 
         subtitleView = new TextView(context);
         subtitleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
         subtitleView.setGravity(Gravity.CENTER);
         subtitleView.setSingleLine();
         subtitleView.setEllipsize(TextUtils.TruncateAt.END);
-        subtitleView.setVisibility(View.GONE);
-        topView.addView(subtitleView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 168 - 12, 0, 0));
+        subtitleView.setOnClickListener(v -> {
+            hidePhoneNumber = false;
+            setInfo();
 
-        final FrameLayout.LayoutParams topViewLp = LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, HEADER_HEIGHT_DP, Gravity.TOP);
-        topViewLp.topMargin = AndroidUtilities.statusBarHeight + dp(12);
-        contentView.addView(topView, topViewLp);
-        actionBarBackground.bringToFront();
-        actionBar.bringToFront();
+            AndroidUtilities.runOnUIThread(() -> {
+                hidePhoneNumber = true;
+                setInfo();
+            }, 5000);
+        });
+        topView.addView(subtitleView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 168 - 12, 0, 0));
 
         versionView = new TextView(context);
         versionView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
@@ -558,7 +532,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         versionView.setGravity(Gravity.CENTER);
         versionView.setBackground(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), Theme.RIPPLE_MASK_ALL));
         versionView.setOnClickListener(v -> {
-            versionViewPressCount++;
+            CherrygramPreferencesNavigator.INSTANCE.createDebug(SettingsActivity.this);
+            /*versionViewPressCount++;
             if (versionViewPressCount < 2 && !BuildVars.DEBUG_PRIVATE_VERSION) {
                 try {
                     Toast.makeText(getParentActivity(), getString(R.string.DebugMenuLongPress), Toast.LENGTH_SHORT).show();
@@ -567,7 +542,11 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 }
                 return;
             }
+            openDebugMenu();*/
+        });
+        versionView.setOnLongClickListener(v -> {
             openDebugMenu();
+            return true;
         });
 
         navigationBar = new View(context);
@@ -578,6 +557,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         setInfo();
         updateColors();
         checkUi_menuItems();
+
+        telegramSettingsHelper.bindViews(avatarContainer, avatarView, cameraButton, imageUpdater, listView);
+        telegramSettingsHelper.checkAvatarActions();
 
         ViewCompat.setOnApplyWindowInsetsListener(contentView, this::onApplyWindowInsets);
         return fragmentView = contentView;
@@ -613,14 +595,20 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     }
 
     public void setInfo(TLRPC.User user) {
+        if (user == null) return;
         if (avatarView == null) return;
         if (avatarUploadingRequest != -1) return;
 
         avatarDrawable.setInfo(user);
-        avatarView.setForUserOrChat(user, avatarDrawable);
+        avatarView.setForUserOrChat(user, avatarDrawable, true);
         titleView.setText(UserObject.getUserName(user));
         final StringBuilder sb = new StringBuilder();
-        if (user != null) {
+        if (hidePhoneNumber) {
+            sb.append(getChatsPasswordHelper().replaceStringToSpoilers(
+                    PhoneFormat.getInstance().format("+ " + user.phone),
+                    true
+            ));
+        } else {
             sb.append(PhoneFormat.getInstance().format("+" + user.phone));
         }
         final String username = UserObject.getPublicUsername(user);
@@ -629,14 +617,20 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
         subtitleView.setText(sb);
 
-        versionView.setText(getVersionName());
+        if (compactProfileHeader != null) {
+            compactProfileHeader.setTitle(UserObject.getUserName(user));
+            compactProfileHeader.setSubtitle(LocaleController.formatUserStatus(currentAccount, user));
+            compactProfileHeader.setUserAvatar(user, true);
+        }
+
+        versionView.setText(AndroidUtilities.getBuildVersionInfo());
     }
 
 
     public void updateColors() {
         actionBar.setTitleColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
-        actionBar.setItemsColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText), false);
-        contentView.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
+        actionBar.setItemsColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueHeader), false);
+        contentView.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
         titleView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
         subtitleView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
         searchItem.updateColor();
@@ -663,14 +657,18 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         updateActionBarVisible(false, true);
     }
     private void updateActionBarVisible(boolean force, boolean animated) {
+        if (actionBar == null) {
+            return;
+        }
+
         final boolean visible;
-        if (searchItem.isSearchFieldVisible2()) {
+        if (searchItem != null && searchItem.isSearchFieldVisible2()) {
             visible = true;
-        } else if (listView.getChildCount() > 0) {
+        } else if (listView != null && listView.getChildCount() > 0) {
             final View firstChild = listView.getChildAt(0);
-            visible = (
-                listView.getChildAdapterPosition(firstChild) > 0 ||
-                firstChild.getY() + firstChild.getHeight() < actionBar.getHeight()
+            visible = firstChild != null && (
+                    listView.getChildAdapterPosition(firstChild) > 0 ||
+                            firstChild.getY() + firstChild.getHeight() < actionBar.getHeight()
             );
         } else {
             visible = false;
@@ -683,14 +681,23 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             actionBarVisibleAnimator = null;
         }
         if (!animated) {
-            actionBar.getTitlesContainer().setAlpha(visible ? 1.0f : 0.0f);
-            actionBarBackground.setAlpha(visible ? 1.0f : 0.0f);
+            if (actionBar.getTitlesContainer() != null) {
+                actionBar.getTitlesContainer().setAlpha(visible ? 1.0f : 0.0f);
+            }
+            if (actionBarBackground != null) {
+                actionBarBackground.setAlpha(visible ? 1.0f : 0.0f);
+            }
         } else {
-            actionBarVisibleAnimator = ValueAnimator.ofFloat(actionBar.getTitlesContainer().getAlpha(), visible ? 1.0f : 0.0f);
+            float startAlpha = actionBar.getTitlesContainer() != null ? actionBar.getTitlesContainer().getAlpha() : 0.0f;
+            actionBarVisibleAnimator = ValueAnimator.ofFloat(startAlpha, visible ? 1.0f : 0.0f);
             actionBarVisibleAnimator.addUpdateListener(a -> {
                 final float t = (float) a.getAnimatedValue();
-                actionBar.getTitlesContainer().setAlpha(t);
-                actionBarBackground.setAlpha(t);
+                if (actionBar != null && actionBar.getTitlesContainer() != null) {
+                    actionBar.getTitlesContainer().setAlpha(t);
+                }
+                if (actionBarBackground != null) {
+                    actionBarBackground.setAlpha(t);
+                }
             });
             actionBarVisibleAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
             actionBarVisibleAnimator.setDuration(420);
@@ -698,322 +705,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         }
     }
 
-    private void updateHeaderCollapseProgress() {
-        if (avatarContainer == null || topView == null || searchItem.isSearchFieldVisible2()) {
-            return;
-        }
-        final float headerReservedHeight = AndroidUtilities.statusBarHeight + dp(12) + dp(HEADER_HEIGHT_DP);
-        final float y = listView.getChildCount() > 0 ? listView.getChildAt(0).getY() : headerReservedHeight;
-
-        if (extraHeight > 0) {
-            // El jalón hacia abajo lo maneja onTouchEvent/animatePullRelease directamente;
-            // no recalcular extraHeight desde Y mientras está activo.
-            return;
-        }
-        isPulledDown = false;
-        if (headerExpandedLayoutApplied) {
-            restoreHeaderRestLayout();
-        }
-
-        final float scrolledIntoHeader = Math.max(0f, headerReservedHeight - y);
-        final float collapseRange = Math.max(dp(40), headerReservedHeight - actionBar.getHeight());
-        final float t = Math.max(0f, Math.min(1f, scrolledIntoHeader / collapseRange));
-
-        topView.setTranslationY(-Math.min(scrolledIntoHeader, collapseRange));
-
-        final float avatarScale = AndroidUtilities.lerp(1f, 0.5f, t);
-        avatarContainer.setScaleX(avatarScale);
-        avatarContainer.setScaleY(avatarScale);
-        if (avatarView.getWidth() > 0) {
-            final float radiusT = Math.min(1f, t / 0.6f);
-            final float radiusFraction = AndroidUtilities.lerp(0.5f, 0.2f, radiusT);
-            avatarView.setRoundRadius((int) (avatarView.getWidth() * radiusFraction));
-        }
-        final float fadeT = Math.min(1f, t / 0.7f);
-        avatarContainer.setAlpha(AndroidUtilities.lerp(1f, 0f, fadeT));
-        titleView.setAlpha(AndroidUtilities.lerp(1f, 0f, fadeT));
-        titleView.setScaleX(AndroidUtilities.lerp(1f, 0.8f, t));
-        titleView.setScaleY(AndroidUtilities.lerp(1f, 0.8f, t));
-        titleView.setTranslationY(0);
-        subtitleView.setAlpha(AndroidUtilities.lerp(1f, 0f, Math.min(1f, t / 0.5f)));
-
-        actionBar.getTitlesContainer().setAlpha(t);
-        actionBarBackground.setAlpha(t);
-    }
-
-    // Fase 2 — jalar hacia abajo desde el tope de la lista, mecánica portada de
-    // ProfileActivity.needLayout()/checkListViewScroll(), adaptada a los views propios
-    // de Ajustes (sin avatarsViewPager, stories, gifts ni botones de acciones).
-    private float getPullExpandRange() {
-        final float listWidth = listView.getMeasuredWidth();
-        return Math.max(dp(150), listWidth - dp(HEADER_HEIGHT_DP));
-    }
-
-    private float getPulledDownExtraHeight() {
-        return getPullExpandRange() * 0.5f;
-    }
-
-    private void updateHeaderPullDown() {
-        final float expandRange = getPullExpandRange();
-        final float expandProgress = Math.max(0f, Math.min(1f, extraHeight / expandRange));
-
-        if (expandProgress >= 0.33f) {
-            isPulledDown = true;
-        } else {
-            isPulledDown = false;
-        }
-
-        final int bannerHeight = dp(HEADER_HEIGHT_DP) + (int) extraHeight;
-        final FrameLayout.LayoutParams topViewLp = (FrameLayout.LayoutParams) topView.getLayoutParams();
-        if (topViewLp.height != bannerHeight) {
-            topViewLp.height = bannerHeight;
-            topView.setLayoutParams(topViewLp);
-        }
-        topView.setTranslationY(0);
-
-        listView.setTranslationY(extraHeight);
-
-        if (extraHeight > 0 && !bigAvatarLoaded) {
-            loadBigAvatarImage();
-        }
-        setHeaderIconsWhite(extraHeight > 0);
-
-        if (isPulledDown) {
-            final FrameLayout.LayoutParams avatarContainerLp = (FrameLayout.LayoutParams) avatarContainer.getLayoutParams();
-            if (avatarContainerLp.width != LayoutHelper.MATCH_PARENT || avatarContainerLp.height != bannerHeight) {
-                avatarContainerLp.width = LayoutHelper.MATCH_PARENT;
-                avatarContainerLp.height = bannerHeight;
-                avatarContainerLp.gravity = Gravity.TOP;
-                avatarContainerLp.topMargin = 0;
-                avatarContainer.setLayoutParams(avatarContainerLp);
-            }
-            avatarContainer.setScaleX(1f);
-            avatarContainer.setScaleY(1f);
-            avatarContainer.setAlpha(1f);
-
-            final FrameLayout.LayoutParams avatarViewLp = (FrameLayout.LayoutParams) avatarView.getLayoutParams();
-            if (avatarViewLp.width != LayoutHelper.MATCH_PARENT || avatarViewLp.height != LayoutHelper.MATCH_PARENT) {
-                avatarViewLp.width = LayoutHelper.MATCH_PARENT;
-                avatarViewLp.height = LayoutHelper.MATCH_PARENT;
-                avatarViewLp.gravity = Gravity.TOP;
-                avatarViewLp.topMargin = 0;
-                avatarView.setLayoutParams(avatarViewLp);
-            }
-            avatarView.setRoundRadius(0);
-            cameraButton.setVisibility(View.GONE);
-            avatarProgressView.setVisibility(View.GONE);
-
-            titleView.setAlpha(1f);
-            titleView.setScaleX(1f);
-            titleView.setScaleY(1f);
-            titleView.setTranslationY(bannerHeight - dp(40));
-            subtitleView.setAlpha(0f);
-            headerExpandedLayoutApplied = true;
-        } else {
-            if (headerExpandedLayoutApplied) {
-                restoreHeaderRestLayout();
-            }
-            final float scale = AndroidUtilities.lerp(1f, 1.15f, Math.min(1f, expandProgress / 0.33f));
-            avatarContainer.setScaleX(scale);
-            avatarContainer.setScaleY(scale);
-            avatarContainer.setAlpha(1f);
-            titleView.setAlpha(1f);
-            titleView.setScaleX(1f);
-            titleView.setScaleY(1f);
-            titleView.setTranslationY(0);
-            subtitleView.setAlpha(0f);
-        }
-
-        actionBar.getTitlesContainer().setAlpha(0f);
-        actionBarBackground.setAlpha(0f);
-    }
-
-    private void restoreHeaderRestLayout() {
-        final FrameLayout.LayoutParams topViewLp = (FrameLayout.LayoutParams) topView.getLayoutParams();
-        if (topViewLp.height != dp(HEADER_HEIGHT_DP)) {
-            topViewLp.height = dp(HEADER_HEIGHT_DP);
-            topView.setLayoutParams(topViewLp);
-        }
-        listView.setTranslationY(0);
-        restoreSmallAvatarImage();
-        setHeaderIconsWhite(false);
-        final FrameLayout.LayoutParams avatarContainerLp = (FrameLayout.LayoutParams) avatarContainer.getLayoutParams();
-        if (avatarContainerLp.width != dp(120) || avatarContainerLp.height != dp(120)) {
-            avatarContainerLp.width = dp(120);
-            avatarContainerLp.height = dp(120);
-            avatarContainerLp.gravity = Gravity.CENTER_HORIZONTAL | Gravity.TOP;
-            avatarContainerLp.topMargin = dp(23 - 12);
-            avatarContainer.setLayoutParams(avatarContainerLp);
-        }
-        final FrameLayout.LayoutParams avatarViewLp = (FrameLayout.LayoutParams) avatarView.getLayoutParams();
-        if (avatarViewLp.width != dp(90) || avatarViewLp.height != dp(90)) {
-            avatarViewLp.width = dp(90);
-            avatarViewLp.height = dp(90);
-            avatarViewLp.gravity = Gravity.CENTER_HORIZONTAL | Gravity.TOP;
-            avatarViewLp.topMargin = dp(15);
-            avatarView.setLayoutParams(avatarViewLp);
-        }
-        cameraButton.setVisibility(View.VISIBLE);
-        avatarProgressView.setVisibility(View.VISIBLE);
-        headerExpandedLayoutApplied = false;
-    }
-
-    private void loadBigAvatarImage() {
-        bigAvatarLoaded = true;
-        TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(UserConfig.getInstance(currentAccount).getClientUserId());
-        if (user == null) {
-            user = UserConfig.getInstance(currentAccount).getCurrentUser();
-        }
-        if (user == null) {
-            return;
-        }
-        final ImageLocation bigLocation = ImageLocation.getForUserOrChat(user, ImageLocation.TYPE_BIG);
-        if (bigLocation == null) {
-            return;
-        }
-        final ImageLocation smallLocation = ImageLocation.getForUserOrChat(user, ImageLocation.TYPE_SMALL);
-        // filtro null = decodifica a resolución nativa completa (igual que ProfileGalleryView
-        // para las fotos grandes); un filtro con tamaño en dp la reduciría y se vería pixelada.
-        avatarView.setImage(bigLocation, null, smallLocation, "50_50", 0, user);
-    }
-
-    private void restoreSmallAvatarImage() {
-        if (!bigAvatarLoaded) {
-            return;
-        }
-        bigAvatarLoaded = false;
-        TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(UserConfig.getInstance(currentAccount).getClientUserId());
-        if (user == null) {
-            user = UserConfig.getInstance(currentAccount).getCurrentUser();
-        }
-        if (user != null) {
-            avatarView.setForUserOrChat(user, avatarDrawable);
-        }
-    }
-
-    private void setHeaderIconsWhite(boolean white) {
-        if (headerIconsWhite == white) {
-            return;
-        }
-        headerIconsWhite = white;
-        actionBar.setItemsColor(white ? 0xffffffff : getThemedColor(Theme.key_windowBackgroundWhiteBlackText), false);
-    }
-
-    private void cancelPullReleaseAnimator() {
-        if (pullReleaseAnimator != null) {
-            pullReleaseAnimator.cancel();
-            pullReleaseAnimator = null;
-        }
-    }
-
-    private void animatePullRelease() {
-        cancelPullReleaseAnimator();
-        final float from = extraHeight;
-        final float to = isPulledDown || (extraHeight >= getPulledDownExtraHeight() * 0.66f && listViewVelocityY > -1000f)
-            ? getPulledDownExtraHeight()
-            : 0f;
-        pullReleaseAnimator = ValueAnimator.ofFloat(from, to);
-        pullReleaseAnimator.addUpdateListener(a -> {
-            extraHeight = (float) a.getAnimatedValue();
-            updateHeaderPullDown();
-        });
-        pullReleaseAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
-        pullReleaseAnimator.setDuration(280);
-        pullReleaseAnimator.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                pullReleaseAnimator = null;
-                if (extraHeight <= 0f) {
-                    extraHeight = 0f;
-                    isPulledDown = false;
-                    if (headerExpandedLayoutApplied) {
-                        restoreHeaderRestLayout();
-                    }
-                    updateHeaderCollapseProgress();
-                }
-            }
-
-            @Override
-            public void onAnimationCancel(Animator animation) {
-                pullReleaseAnimator = null;
-            }
-        });
-        pullReleaseAnimator.start();
-    }
-
-    private void openAvatarPhoto() {
-        openAvatarPhoto(false);
-    }
-
-    private void openAvatarPhoto(boolean ignoreDragging) {
-        if (listView.getScrollState() == RecyclerView.SCROLL_STATE_DRAGGING && !ignoreDragging) {
-            return;
-        }
-        TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(UserConfig.getInstance(currentAccount).getClientUserId());
-        if (user == null) {
-            user = UserConfig.getInstance(currentAccount).getCurrentUser();
-        }
-        if (user != null && user.photo != null && user.photo.photo_big != null) {
-            PhotoViewer.getInstance().setParentActivity(SettingsActivity.this);
-            if (user.photo.dc_id != 0) {
-                user.photo.photo_big.dc_id = user.photo.dc_id;
-            }
-            PhotoViewer.getInstance().openPhoto(user.photo.photo_big, getAvatarPhotoViewerProvider());
-        }
-    }
-
-    private PhotoViewer.PhotoViewerProvider getAvatarPhotoViewerProvider() {
-        if (avatarPhotoViewerProvider == null) {
-            avatarPhotoViewerProvider = new PhotoViewer.EmptyPhotoViewerProvider() {
-                @Override
-                public PhotoViewer.PlaceProviderObject getPlaceForPhoto(MessageObject messageObject, TLRPC.FileLocation fileLocation, int index, boolean needPreview, boolean closing) {
-                    if (fileLocation == null || avatarView == null) {
-                        return null;
-                    }
-                    if (avatarContainer.getScaleX() > 0.96f && closing) {
-                        return null;
-                    }
-                    TLRPC.User user = UserConfig.getInstance(currentAccount).getCurrentUser();
-                    TLRPC.FileLocation photoBig = user != null && user.photo != null ? user.photo.photo_big : null;
-                    if (photoBig != null && photoBig.local_id == fileLocation.local_id && photoBig.volume_id == fileLocation.volume_id && photoBig.dc_id == fileLocation.dc_id) {
-                        int[] coords = new int[2];
-                        avatarView.getLocationInWindow(coords);
-                        PhotoViewer.PlaceProviderObject object = new PhotoViewer.PlaceProviderObject();
-                        object.viewX = coords[0];
-                        object.viewY = coords[1];
-                        object.parentView = avatarView;
-                        object.imageReceiver = avatarView.getImageReceiver();
-                        object.dialogId = UserConfig.getInstance(currentAccount).getClientUserId();
-                        object.thumb = object.imageReceiver.getBitmapSafe();
-                        if (object.thumb == null) {
-                            return null;
-                        }
-                        object.size = -1;
-                        object.radius = avatarView.getImageReceiver().getRoundRadius(true);
-                        object.scale = avatarContainer.getScaleX();
-                        object.canEdit = true;
-                        object.fadeIn = avatarContainer.getScaleX() > 0.96f;
-                        return object;
-                    }
-                    return null;
-                }
-
-                @Override
-                public void willHidePhotoViewer() {
-                    avatarView.getImageReceiver().setVisible(true, true);
-                }
-
-                @Override
-                public void openPhotoForEdit(String file, String thumb, boolean isVideo) {
-                    imageUpdater.openPhotoForEdit(file, thumb, 0, isVideo);
-                }
-            };
-        }
-        return avatarPhotoViewerProvider;
-    }
-
     private ArrayList<Integer> accountNumbers = new ArrayList<>();
-    private View createAccountInfoRow(CharSequence title, CharSequence subtitle, Runnable onClick) {
+
+    private View createMDGramAccountInfoRow(CharSequence title, CharSequence subtitle, Runnable onClick) {
         LinearLayout row = new LinearLayout(getContext());
         row.setOrientation(LinearLayout.VERTICAL);
         row.setPadding(dp(18), dp(subtitle == null ? 15 : 10), dp(18), dp(subtitle == null ? 15 : 10));
@@ -1024,21 +718,86 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             }
         });
 
-        TextView titleView = new TextView(getContext());
-        titleView.setText(title);
-        titleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
-        titleView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
-        row.addView(titleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        TextView rowTitle = new TextView(getContext());
+        rowTitle.setText(title);
+        rowTitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        rowTitle.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
+        row.addView(rowTitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         if (subtitle != null) {
-            TextView subtitleView = new TextView(getContext());
-            subtitleView.setText(subtitle);
-            subtitleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
-            subtitleView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
-            row.addView(subtitleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 4, 0, 0));
+            TextView rowSubtitle = new TextView(getContext());
+            rowSubtitle.setText(subtitle);
+            rowSubtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            rowSubtitle.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
+            row.addView(rowSubtitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 4, 0, 0));
+        }
+        return row;
+    }
+
+    private void fillMDGramItems(ArrayList<UItem> items) {
+        accountNumbers.clear();
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            if (UserConfig.getInstance(a).isClientActivated() && currentAccount != a) {
+                accountNumbers.add(a);
+            }
+        }
+        accountNumbers.sort((o1, o2) -> Long.compare(
+                UserConfig.getInstance(o1).loginTime,
+                UserConfig.getInstance(o2).loginTime));
+
+        if (!accountNumbers.isEmpty()) {
+            items.add(UItem.asHeader(getString(R.string.SettingsAccounts)));
+            for (int i = 0; i < accountNumbers.size(); i++) {
+                items.add(AccountCell.Factory.of(i, accountNumbers.get(i)));
+            }
+            items.add(UItem.asShadow(null));
         }
 
-        return row;
+        items.add(UItem.asHeader(getString(R.string.SettingsAccount)));
+        final TLRPC.User accountUser = getUserConfig().getCurrentUser();
+        if (accountUser != null) {
+            items.add(UItem.asCustom(createMDGramAccountInfoRow(
+                    PhoneFormat.getInstance().format("+" + accountUser.phone),
+                    getString(R.string.TapToChangePhone),
+                    () -> presentFragment(new ActionIntroActivity(ActionIntroActivity.ACTION_TYPE_CHANGE_PHONE_NUMBER))),
+                    LayoutHelper.WRAP_CONTENT));
+        }
+        String publicUsername = UserObject.getPublicUsername(accountUser);
+        items.add(UItem.asCustom(createMDGramAccountInfoRow(
+                publicUsername != null ? "@" + publicUsername : getString(R.string.AddUsername),
+                publicUsername != null ? getString(R.string.Username) : null,
+                () -> presentFragment(new UserInfoActivity())), LayoutHelper.WRAP_CONTENT));
+        TLRPC.UserFull accountUserFull = getMessagesController().getUserFull(getUserConfig().getClientUserId());
+        String bio = accountUserFull != null ? accountUserFull.about : null;
+        if (!TextUtils.isEmpty(bio)) {
+            items.add(UItem.asCustom(createMDGramAccountInfoRow(
+                    bio, "Biografía", () -> presentFragment(new UserInfoActivity())),
+                    LayoutHelper.WRAP_CONTENT));
+        }
+
+        items.add(UItem.asShadow(null));
+        items.add(UItem.asHeader(getString(R.string.Settings)));
+        items.add(UItem.asButton(4, R.drawable.msg_settings, "Ajustes de MDGram"));
+        items.add(UItem.asButton(9, R.drawable.msg2_battery, getString(R.string.SettingsPowerSaving)));
+        items.add(UItem.asButton(8, R.drawable.msg2_devices, getString(R.string.SettingsDevices)));
+        items.add(UItem.asButton(10, R.drawable.msg2_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
+        items.add(UItem.asButton(24, R.drawable.msg_info, "Acerca de MDGram"));
+
+        items.add(UItem.asShadow(null));
+        if (!getMessagesController().premiumFeaturesBlocked()) {
+            items.add(UItem.asButton(11, R.drawable.settings_premium, getString(R.string.TelegramPremium)));
+            items.add(UItem.asButton(15, R.drawable.filled_premium_business, getString(R.string.TelegramBusiness)));
+        }
+        if (!getMessagesController().premiumPurchaseBlocked()) {
+            items.add(UItem.asButton(16, R.drawable.msg_gift_premium, getString(R.string.SendAGift)));
+        }
+
+        items.add(UItem.asShadow(null));
+        items.add(UItem.asHeader(getString(R.string.SettingsHelp)));
+        items.add(UItem.asButton(17, R.drawable.msg2_ask_question, getString(R.string.AskAQuestion)));
+        items.add(UItem.asButton(18, R.drawable.msg2_help, getString(R.string.TelegramFAQ)));
+        items.add(UItem.asButton(19, R.drawable.msg2_policy, getString(R.string.PrivacyPolicy)));
+        items.add(UItem.asCustomShadow(versionView));
     }
 
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
@@ -1048,21 +807,35 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             return;
         }
 
+        // Keep the current activity and click handlers, but render the compact
+        // MDGram V21 hierarchy captured from the original application.
+        if (listView != null) {
+            fillMDGramItems(items);
+            return;
+        }
+
+        items.add(UItem.asCustomShadow(topView, 200 - 12));
+
+        int activeAccounts = 0;
         accountNumbers.clear();
         for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
-            if (UserConfig.getInstance(a).isClientActivated() && currentAccount != a) {
-                accountNumbers.add(a);
+            if (UserConfig.getInstance(a).isClientActivated()) {
+                activeAccounts++;
             }
         }
-        Collections.sort(accountNumbers, (o1, o2) -> {
+
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            if (UserConfig.getInstance(a).isClientActivated()) {
+                if (activeAccounts >= 3 || currentAccount != a) {
+                    accountNumbers.add(a);
+                }
+            }
+        }
+
+        accountNumbers.sort((o1, o2) -> {
             long l1 = UserConfig.getInstance(o1).loginTime;
             long l2 = UserConfig.getInstance(o2).loginTime;
-            if (l1 > l2) {
-                return 1;
-            } else if (l1 < l2) {
-                return -1;
-            }
-            return 0;
+            return Long.compare(l1, l2);
         });
 
         final Set<String> suggestions = getMessagesController().pendingSuggestions;
@@ -1083,10 +856,14 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 replaceSingleTag(getString(R.string.CheckPhoneNumberInfo), () -> {
                     Browser.openUrl(getContext(), getString(R.string.CheckPhoneNumberLearnMoreUrl));
                 }),
-                getString(R.string.CheckPhoneNumberNo), v -> {
+                /*getString(R.string.CheckPhoneNumberNo), v -> {
                     presentFragment(new ActionIntroActivity(ActionIntroActivity.ACTION_TYPE_CHANGE_PHONE_NUMBER));
                 },
                 replaceUnderstood(getString(R.string.CheckPhoneNumberYes2)), v -> {
+                    getMessagesController().removeSuggestion(0, "VALIDATE_PHONE_NUMBER");
+                }*/
+                "", null,
+                getString(R.string.Understood), v -> {
                     getMessagesController().removeSuggestion(0, "VALIDATE_PHONE_NUMBER");
                 }
             ));
@@ -1105,50 +882,72 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             items.add(UItem.asShadow(null));
         }
 
-        if (accountNumbers.size() > 0) {
+        /*if (accountNumbers.size() > 0) {
             items.add(UItem.asHeader(getString(R.string.SettingsAccounts)));
             for (int i = 0; i < accountNumbers.size(); ++i) {
                 items.add(AccountCell.Factory.of(i, accountNumbers.get(i)));
             }
             items.add(UItem.asShadow(null));
-        }
+        }*/
 
-        items.add(UItem.asHeader(getString(R.string.SettingsAccount)));
-        final TLRPC.User accountUser = getUserConfig().getCurrentUser();
-        if (accountUser != null) {
-            items.add(UItem.asCustom(createAccountInfoRow(PhoneFormat.getInstance().format("+" + accountUser.phone), getString(R.string.TapToChangePhone), () -> presentFragment(new ActionIntroActivity(ActionIntroActivity.ACTION_TYPE_CHANGE_PHONE_NUMBER))), LayoutHelper.WRAP_CONTENT));
-        }
-        String publicUsername = UserObject.getPublicUsername(accountUser);
-        items.add(UItem.asCustom(createAccountInfoRow(publicUsername != null ? "@" + publicUsername : getString(R.string.AddUsername), publicUsername != null ? getString(R.string.Username) : null, () -> presentFragment(new UserInfoActivity())), LayoutHelper.WRAP_CONTENT));
-        TLRPC.UserFull accountUserFull = getMessagesController().getUserFull(getUserConfig().getClientUserId());
-        String bio = accountUserFull != null ? accountUserFull.about : null;
-        if (!TextUtils.isEmpty(bio)) {
-            items.add(UItem.asCustom(createAccountInfoRow(bio, "Biografía", () -> presentFragment(new UserInfoActivity())), LayoutHelper.WRAP_CONTENT));
-        }
-        items.add(UItem.asShadow(null));
-        items.add(UItem.asButton(4, R.drawable.msg_settings, "Ajustes de MDGram"));
-        items.add(UItem.asButton(9, R.drawable.msg2_battery, getString(R.string.SettingsPowerSaving)));
-        items.add(UItem.asButton(8, R.drawable.msg2_devices, getString(R.string.SettingsDevices)));
-        items.add(UItem.asButton(10, R.drawable.msg2_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
-        items.add(UItem.asButton(24, R.drawable.msg_info, "Acerca de MDGram"));
+        telegramSettingsHelper.injectChannelAdvice(items);
+        telegramSettingsHelper.injectAccounts(adapter, items, accountNumbers, getUserConfig().getCurrentUser());
+        telegramSettingsHelper.injectCherryItems(items, getUserConfig().getCurrentUser());
+
+        items.add(SettingCell.Factory.of(2, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_chat, getString(R.string.SettingsChat), getString(R.string.SettingsChatInfo)));
+        items.add(SettingCell.Factory.of(3, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.settings_privacy, getString(R.string.SettingsPrivacySecurity), getString(R.string.SettingsPrivacySecurityInfo)));
+        items.add(SettingCell.Factory.of(5, IconBackgroundColors.RED.top, IconBackgroundColors.RED.bottom, R.drawable.settings_sounds, getString(R.string.SettingsNotifications), getString(R.string.SettingsNotificationsInfo)));
+        items.add(SettingCell.Factory.of(6, IconBackgroundColors.BLUE_DEEP.top, IconBackgroundColors.BLUE_DEEP.bottom, R.drawable.settings_data, getString(R.string.SettingsData), getString(R.string.SettingsDataInfo)));
+        items.add(SettingCell.Factory.of(7, IconBackgroundColors.BLUE_ALT.top, IconBackgroundColors.BLUE_ALT.bottom, R.drawable.settings_folders, getString(R.string.SettingsFolders), getString(R.string.SettingsFoldersInfo)));
+        items.add(SettingCell.Factory.of(8, IconBackgroundColors.CYAN.top, IconBackgroundColors.CYAN.bottom, R.drawable.settings_devices, getString(R.string.SettingsDevices), getString(R.string.SettingsDevicesInfo)));
+        items.add(SettingCell.Factory.of(9, IconBackgroundColors.ORANGE_DEEP.top, IconBackgroundColors.ORANGE_DEEP.bottom, R.drawable.settings_power, getString(R.string.SettingsPowerSaving), getString(R.string.SettingsPowerSavingInfo)));
+        items.add(SettingCell.Factory.of(10, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
 
         items.add(UItem.asShadow(null));
 
-        // MDGram: se ocultan Telegram Premium / Telegram Business / Regalar Premium (no aplican a nuestra app)
-        if (false) {
+        if (!getMessagesController().premiumFeaturesBlocked()) {
             items.add(SettingCell.Factory.of(11, 0xFFB659FF, 0xFF617CFF, R.drawable.settings_premium, getString(R.string.TelegramPremium)));
-            items.add(UItem.asButton(15, R.drawable.filled_premium_business, getString(R.string.TelegramBusiness)));
-            items.add(UItem.asButton(16, R.drawable.msg_gift_premium, "Regalar Premium"));
+        }
+        if (getMessagesController().starsPurchaseAvailable()) {
+            StarsController c = StarsController.getInstance(currentAccount);
+            long balance = c.getBalance().amount;
+            items.add(SettingCell.Factory.of(12, 0xFFEFA612, 0xFFE77512, R.drawable.settings_stars, getString(R.string.TelegramStars), null, c.balanceAvailable() && balance > 0 ? StarsIntroActivity.formatStarsAmount(c.getBalance(), 0.85f, ' ') : ""));
+        }
+        StarsController.getInstance(currentAccount, true).getBalance();
+        if (ApplicationLoader.isBetaBuild() || ApplicationLoader.isStandaloneBuild() || ApplicationLoader.isHuaweiStoreBuild() || (StarsController.getInstance(currentAccount, true).balanceAvailable() && (StarsController.getInstance(currentAccount, true).hasTransactions() || StarsController.getInstance(currentAccount, true).getBalance().positive()))) {
+            StarsController c = StarsController.getTonInstance(currentAccount);
+            long balance = c.getBalance().amount;
+            items.add(SettingCell.Factory.of(13, 0xFF1BA4ED, 0xFF1488E1, R.drawable.settings_gram_24, getString(R.string.MyTON), null, c.balanceAvailable() && balance > 0 ? StarsIntroActivity.formatStarsAmount(c.getBalance(), 0.85f, ' ') : ""));
+        }
+
+        TLRPC.TL_attachMenuBots menuBots = MediaDataController.getInstance(UserConfig.selectedAccount).getAttachMenuBots();
+        if (menuBots != null && menuBots.bots != null && !menuBots.bots.isEmpty()) {
+            for (TLRPC.TL_attachMenuBot attachMenuBot : menuBots.bots) {
+                final long WALLET_BOT_ID = 1985737506L;
+                if (attachMenuBot.show_in_side_menu && attachMenuBot.bot_id == WALLET_BOT_ID) {
+                    UItem item = SettingCell.Factory.ofBot(attachMenuBot, 0xFF1BA4ED, 0xFF1488E1, R.drawable.settings_wallet);
+                    item.object = attachMenuBot;
+                    items.add(item);
+                }
+            }
+        }
+
+        if (!getMessagesController().premiumFeaturesBlocked()) {
+            items.add(SettingCell.Factory.of(15, 0xFFF45255, 0xFFDF3955, R.drawable.settings_business, getString(R.string.TelegramBusiness)));
+        }
+        if (!getMessagesController().premiumPurchaseBlocked()) {
+            items.add(SettingCell.Factory.of(16, 0xFFF38B31, 0xFFE26314, R.drawable.settings_gift, getString(R.string.SendAGift)));
         }
         if (items.get(items.size() - 1).viewType != UniversalAdapter.VIEW_TYPE_SHADOW)
             items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader(getString(R.string.SettingsHelp)));
-        items.add(UItem.asButton(17, R.drawable.msg2_ask_question, getString(R.string.AskAQuestion)));
-        items.add(UItem.asButton(18, R.drawable.msg2_help, getString(R.string.TelegramFAQ)));
-        items.add(UItem.asButton(19, R.drawable.msg2_policy, getString(R.string.PrivacyPolicy)));
+        items.add(SettingCell.Factory.of(17, IconBackgroundColors.ORANGE.top, IconBackgroundColors.ORANGE.bottom, R.drawable.settings_ask, getString(R.string.AskAQuestion)));
+        items.add(SettingCell.Factory.of(18, IconBackgroundColors.BLUE_LIGHT.top, IconBackgroundColors.BLUE_LIGHT.bottom, R.drawable.settings_faq, getString(R.string.TelegramFAQ)));
+        items.add(SettingCell.Factory.of(23, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_features, getString(R.string.TelegramFeatures)));
+        items.add(SettingCell.Factory.of(19, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.settings_policy, getString(R.string.PrivacyPolicy)));
 
-        if (false) {
+        if (BuildVars.LOGS_ENABLED || BuildVars.DEBUG_PRIVATE_VERSION) {
             items.add(UItem.asShadow(null));
             items.add(UItem.asHeader(getString(R.string.SettingsDebug)));
             items.add(SettingCell.Factory.of(20, 0xFF55CA47, 0xFF27B434, 0, getString(R.string.DebugSendLogs)));
@@ -1156,14 +955,52 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             items.add(SettingCell.Factory.of(22, 0xFFF45255, 0xFFDF3955, 0, getString(R.string.DebugClearLogs)));
         }
 
+        items.add(SettingCell.Factory.of(24, IconBackgroundColors.CYAN.top, IconBackgroundColors.CYAN.bottom, R.drawable.msg_info, "Acerca de MDGram", null));
         items.add(UItem.asCustomShadow(versionView));
     }
 
+    private void presentSettingFragment(BaseFragment fragment) {
+        if (AndroidUtilities.isTablet() && LaunchActivity.instance != null && LaunchActivity.instance.getRightActionBarLayout() != null) {
+            final INavigationLayout layout = LaunchActivity.instance.getRightActionBarLayout();
+            if (!layout.getFragmentStack().isEmpty()) {
+                for (int a = 0; a < layout.getFragmentStack().size() - 1; a++) {
+                    layout.removeFragmentFromStack(layout.getFragmentStack().get(0));
+                    a--;
+                }
+                layout.closeLastFragment(false);
+            }
+            layout.presentFragment(new INavigationLayout.NavigationParams(fragment).setNoAnimation(true).forceRightLayout());
+        } else {
+            presentFragment(fragment);
+        }
+    }
+
     private void onClick(UItem item, View view, int position, float x, float y) {
+        if (item.object instanceof TLRPC.TL_attachMenuBot) {
+            TLRPC.TL_attachMenuBot attachMenuBot = (TLRPC.TL_attachMenuBot) item.object;
+            if (attachMenuBot.inactive || attachMenuBot.side_menu_disclaimer_needed) {
+                WebAppDisclaimerAlert.show(getContext(), (allowSendMessage) -> {
+                    TLRPC.TL_messages_toggleBotInAttachMenu botRequest = new TLRPC.TL_messages_toggleBotInAttachMenu();
+                    botRequest.bot = MessagesController.getInstance(currentAccount).getInputUser(attachMenuBot.bot_id);
+                    botRequest.enabled = true;
+                    botRequest.write_allowed = true;
+                    ConnectionsManager.getInstance(currentAccount).sendRequest(botRequest, (response2, error2) -> AndroidUtilities.runOnUIThread(() -> {
+                        attachMenuBot.inactive = attachMenuBot.side_menu_disclaimer_needed = false;
+                        LaunchActivity.showAttachMenuBot(LaunchActivity.instance, currentAccount, attachMenuBot, null, true);
+                        MediaDataController.getInstance(currentAccount).updateAttachMenuBotsInCache();
+                    }), ConnectionsManager.RequestFlagInvokeAfter | ConnectionsManager.RequestFlagFailOnServerErrors);
+                }, null, null);
+            } else {
+                LaunchActivity.showAttachMenuBot(LaunchActivity.instance, currentAccount, attachMenuBot, null, true);
+            }
+            return;
+        }
         if (item.instanceOf(AccountCell.Factory.class)) {
             final int account = item.intValue;
+            if (account == UserConfig.selectedAccount) return;
             if (LaunchActivity.instance != null) {
                 LaunchActivity.instance.switchToAccount(account, true);
+                CGBulletinCreator.INSTANCE.createSwitchAccountBulletin(account);
             }
             return;
         } else if (item.instanceOf(SettingsSearchCell.Factory.class)) {
@@ -1179,49 +1016,61 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             }
             return;
         }
+        telegramSettingsHelper.handleOnClick(item);
         switch (item.id) {
             case 1:
-                presentFragment(new UserInfoActivity());
+                if (TelegramSettingsHelper.Helper.INSTANCE.showMyProfile()) {
+                    Bundle args = new Bundle();
+                    args.putLong("user_id", UserConfig.getInstance(currentAccount).getClientUserId());
+                    args.putBoolean("my_profile", true);
+                    args.putBoolean("hasMainTabs", false);
+                    presentFragment(new ProfileActivity(args));
+                } else {
+                    presentSettingFragment(new UserInfoActivity());
+                }
                 break;
             case 2:
-                presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC));
-                break;
-            case 3:
-                presentFragment(new PrivacySettingsActivity());
-                break;
-            case 5:
-                presentFragment(new NotificationsSettingsActivity());
-                break;
-            case 6:
-                presentFragment(new DataSettingsActivity());
-                break;
-            case 7:
-                presentFragment(new FiltersSetupActivity());
-                break;
-            case 8:
-                presentFragment(new SessionsActivity(0));
-                break;
-            case 9:
-                presentFragment(new LiteModeSettingsActivity());
-                break;
-            case 10:
-                presentFragment(new LanguageSelectActivity());
+                presentSettingFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC));
                 break;
             case 4:
-                presentFragment(new MDGramSettingsActivity()); // MDGram: hub de ajustes del mod (General → estilos de fuente, etc.)
+                presentSettingFragment(new org.telegram.ui.MDGramSettingsActivity());
+                break;
+            case 24:
+                presentFragment(new org.telegram.ui.AboutMDGramActivity());
+                break;
+            case 3:
+                presentSettingFragment(new PrivacySettingsActivity());
+                break;
+            case 5:
+                presentSettingFragment(new NotificationsSettingsActivity());
+                break;
+            case 6:
+                presentSettingFragment(new DataSettingsActivity());
+                break;
+            case 7:
+                presentSettingFragment(new FiltersSetupActivity());
+                break;
+            case 8:
+                presentSettingFragment(new SessionsActivity(0));
+                break;
+            case 9:
+                presentSettingFragment(new LiteModeSettingsActivity());
+                break;
+            case 10:
+                presentSettingFragment(new LanguageSelectActivity());
                 break;
 
             case 11:
-                presentFragment(new PremiumPreviewFragment("settings"));
+                presentSettingFragment(new PremiumPreviewFragment("settings"));
                 break;
             case 12:
-                presentFragment(new StarsIntroActivity());
+                presentSettingFragment(new StarsIntroActivity());
                 break;
             case 13:
-                presentFragment(new TONIntroActivity());
+                presentSettingFragment(new TONIntroActivity());
                 break;
             case 15:
-                presentFragment(new PremiumPreviewFragment(PremiumPreviewFragment.FEATURES_BUSINESS, "settings"));
+                presentSettingFragment(new PremiumPreviewFragment(PremiumPreviewFragment.FEATURES_BUSINESS, "settings"));
                 break;
             case 16:
                 UserSelectorBottomSheet.open(0, BirthdayController.getInstance(UserConfig.selectedAccount).getState());
@@ -1254,13 +1103,18 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 }
                 break;
             }
-            case 24:
-                presentFragment(new AboutMDGramActivity());
-                break;
         }
     }
 
     private boolean onLongClick(UItem item, View view, int position, float x, float y) {
+        telegramSettingsHelper.handleOnLongClick(item);
+
+        if (item.object instanceof TLRPC.TL_attachMenuBot) {
+            TLRPC.TL_attachMenuBot attachMenuBot = (TLRPC.TL_attachMenuBot) item.object;
+            BotWebViewSheet.deleteBot(currentAccount, attachMenuBot.bot_id, () -> listView.adapter.update(true));
+            return true;
+        }
+
         if (item.instanceOf(SettingsSearchCell.Factory.class)) {
             String link = null;
             if (item.object instanceof ProfileActivity.SearchAdapter.SearchResult) {
@@ -1304,7 +1158,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                     }
                     break;
             }
-            return String.format(Locale.US, "MDGram %s || TG Base %s || %s", org.telegram.messenger.MDGramUpdater.MD_VERSION_NAME, pInfo.versionName, abi);
+            return formatString(R.string.TelegramVersion, String.format(Locale.US, "v%s (%d)\n%s", pInfo.versionName, code, abi));
         } catch (Exception e) {
             FileLog.e(e);
         }
@@ -1325,16 +1179,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
     @NonNull
     private WindowInsetsCompat onApplyWindowInsets(@NonNull View v, @NonNull WindowInsetsCompat insets) {
-        final int statusBarHeight = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top;
-        navigationBarHeight = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom;
-        listView.setPadding(0, statusBarHeight + dp(12) + dp(HEADER_HEIGHT_DP), 0, navigationBarHeight + additionNavigationBarHeight);
-        if (topView != null) {
-            final ViewGroup.MarginLayoutParams topViewLp = (ViewGroup.MarginLayoutParams) topView.getLayoutParams();
-            if (topViewLp != null) {
-                topViewLp.topMargin = statusBarHeight + dp(12);
-                topView.setLayoutParams(topViewLp);
-            }
-        }
+        final Insets systemInsets = AndroidUtilities.getDefaultWindowInsets(insets, false);
+        navigationBarHeight = systemInsets.bottom;
+        final int statusBarHeight = systemInsets.top;
+        listView.setPadding(0, statusBarHeight + ActionBar.getCurrentActionBarHeight(), 0, navigationBarHeight + additionNavigationBarHeight);
         return WindowInsetsCompat.CONSUMED;
     }
 
@@ -1349,6 +1197,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable botDrawable;
         private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable emojiStatusDrawable;
+        private final AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable cherrygramStatusDrawable;
 
         public AccountCell(Context context, Theme.ResourcesProvider resourcesProvider) {
             super(context);
@@ -1367,17 +1216,21 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
             botDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(textView, dp(24), AnimatedEmojiDrawable.CACHE_TYPE_EMOJI_STATUS);
             emojiStatusDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(textView, dp(24), AnimatedEmojiDrawable.CACHE_TYPE_EMOJI_STATUS);
+            cherrygramStatusDrawable = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(textView, dp(22), AnimatedEmojiDrawable.CACHE_TYPE_EMOJI_STATUS);
+
             textView.addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
                 @Override
                 public void onViewAttachedToWindow(@NonNull View v) {
                     botDrawable.attach();
                     emojiStatusDrawable.attach();
+                    cherrygramStatusDrawable.attach();
                 }
 
                 @Override
                 public void onViewDetachedFromWindow(@NonNull View v) {
                     botDrawable.detach();
                     emojiStatusDrawable.detach();
+                    cherrygramStatusDrawable.detach();
                 }
             });
 
@@ -1418,10 +1271,12 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider));
             counterView.setBackground(Theme.createRoundRectDrawable(dp(10), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)));
             arrowView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon, resourcesProvider), PorterDuff.Mode.SRC_IN));
+            emojiStatusDrawable.setColor(Theme.getColor(Theme.key_profile_verifiedBackground, resourcesProvider));
         }
 
         public void set(int account) {
             final TLRPC.User user = UserConfig.getInstance(account).getCurrentUser();
+            boolean isSelected = account == UserConfig.selectedAccount;
 
             avatarDrawable.setInfo(account, user);
             avatarView.getImageReceiver().setCurrentAccount(account);
@@ -1430,6 +1285,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
             botDrawable.setCurrentAccount(account);
             emojiStatusDrawable.setCurrentAccount(account);
+            cherrygramStatusDrawable.setCurrentAccount(account);
 
             botDrawable.setColor(Theme.getColor(Theme.key_profile_verifiedBackground, resourcesProvider));
             if (user != null && user.bot_verification_icon != 0) {
@@ -1449,9 +1305,13 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             textView.setLeftDrawable(!botDrawable.isEmpty() ? botDrawable : null);
             textView.setRightDrawable(!emojiStatusDrawable.isEmpty() ? emojiStatusDrawable : null);
 
+            checkCherrygramBadge(user);
+
             int counter = MessagesStorage.getInstance(account).getMainUnreadCount();
             counterView.setVisibility(counter > 0 ? View.VISIBLE : View.GONE);
             counterView.setText(LocaleController.formatNumber(counter, ','));
+
+            updateContainer(isSelected);
         }
 
         @Override
@@ -1482,9 +1342,17 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 return item;
             }
 
+            public static UItem of(int account) {
+                final UItem item = UItem.ofFactory(AccountCell.Factory.class);
+                item.intValue = account;
+                item.object = account;
+
+                return item;
+            }
+
             @Override
             public boolean equals(UItem a, UItem b) {
-                return a.id == b.id;
+                return a.intValue == b.intValue;
             }
 
             @Override
@@ -1492,11 +1360,80 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 return a.intValue == b.intValue;
             }
         }
+
+        /** Cherrygram start */
+        private void checkCherrygramBadge(TLRPC.User user) {
+            if (user == null) return;
+
+            long emojiDocumentId;
+            boolean isPremium = false; // cgPremium
+            boolean isDonated = DonatesManager.INSTANCE.didUserDonate(user.id);
+            boolean forceBra = user.id == Constants.Cherrygram_Owner;
+            boolean showParticles = isPremium || forceBra || DonatesManager.INSTANCE.didUserDonateForMarketplace(user.id);
+
+            if (isPremium && isDonated) {
+                emojiDocumentId = Constants.CHERRY_EMOJI_ID_VERIFIED_BRA;
+            } else if (isPremium || isDonated || forceBra) {
+                emojiDocumentId = isPremium || forceBra ? Constants.CHERRY_EMOJI_ID_VERIFIED_BRA : Constants.CHERRY_EMOJI_ID_VERIFIED;
+            } else {
+                emojiDocumentId = 0;
+                textView.setRightDrawable2(null);
+            }
+
+            if (emojiDocumentId != 0) {
+                cherrygramStatusDrawable.set(emojiDocumentId, false);
+
+                int color = Theme.getColor(Theme.key_chats_verifiedBackground, resourcesProvider);
+                cherrygramStatusDrawable.setColor(BadgeHelper.Companion.getEmojiStatusColor(user.id, color, false));
+                cherrygramStatusDrawable.setParticles(showParticles, showParticles);
+
+                textView.setRightDrawable2(cherrygramStatusDrawable);
+                textView.setRightDrawableInside(true);
+            }
+        }
+
+        private void updateContainer(boolean isSelected) {
+            int radius = dp(14);
+
+            if (isSelected) {
+                int containerColor = Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider);
+
+                GradientDrawable drawable = new GradientDrawable();
+                drawable.setCornerRadius(radius);
+                drawable.setColor(ColorUtils.setAlphaComponent(containerColor, 40));
+                drawable.setStroke(dp(1), ColorUtils.setAlphaComponent(containerColor, 120));
+
+                InsetDrawable insetDrawable = new InsetDrawable(
+                        drawable,
+                        dp(10), dp(2), dp(10), dp(2)
+                );
+
+                setBackground(insetDrawable);
+                setPadding(dp(6), dp(2), dp(6), dp(2));
+            } else {
+                setBackground(null);
+                setPadding(0, 0, 0, 0);
+            }
+
+            ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) counterView.getLayoutParams();
+            if (isSelected) {
+                lp.setMarginEnd(-dp(18));
+                arrowView.setImageResource(0);
+            } else {
+                lp.setMarginEnd(0);
+                arrowView.setImageResource(R.drawable.msg_arrowright);
+            }
+            counterView.setLayoutParams(lp);
+
+            updateColors();
+        }
+        /** Cherrygram finish */
+
     }
 
     @Override
     public boolean onBackPressed(boolean invoked) {
-        if (actionBar.isSearchFieldVisible()) {
+        if (actionBar != null && actionBar.isSearchFieldVisible()) {
             if (invoked) actionBar.closeSearchField();
             return false;
         }
@@ -1507,21 +1444,31 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
         private final Theme.ResourcesProvider resourcesProvider;
         private final Background iconBackground;
+        private final FrameLayout iconLayout;
         private final ImageView iconView;
         private final LinearLayout textLayout;
         private final TextView titleView;
         private final TextView subtitleView;
         private final TextView valueView;
+        private final boolean mini;
 
         public SettingCell(Context context, Theme.ResourcesProvider resourcesProvider) {
+            this(context, resourcesProvider, false);
+        }
+
+        public SettingCell(Context context, Theme.ResourcesProvider resourcesProvider, boolean mini) {
             super(context);
 
             this.resourcesProvider = resourcesProvider;
+            this.mini = mini;
             setOrientation(HORIZONTAL);
 
+            iconLayout = new FrameLayout(context);
+            iconLayout.setBackground(iconBackground = new Background());
+
             iconView = new ImageView(context);
-            iconView.setScaleType(ImageView.ScaleType.CENTER);
-            iconView.setBackground(iconBackground = new Background());
+            iconView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            iconLayout.addView(iconView, LayoutHelper.createFrame(24, 24, Gravity.CENTER));
 
             textLayout = new LinearLayout(context);
             textLayout.setOrientation(VERTICAL);
@@ -1532,18 +1479,58 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
             subtitleView = new TextView(context);
             subtitleView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
-            textLayout.addView(subtitleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 4, 0, 0));
+            if (cgSettings) {
+                subtitleView.setMaxLines(5);
+                subtitleView.setEllipsize(TextUtils.TruncateAt.END);
+                subtitleView.setLineSpacing(dp(2), 0.92f);
+                textLayout.addView(subtitleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 1, 0, 0));
+            } else {
+                textLayout.addView(subtitleView, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 4, 0, 0));
+            }
+
+            counterView = new TextView(context);
+            counterView.setPadding(dp(6.66f), 0, dp(6.66f), 0);
+            counterView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);
+            counterView.setTypeface(AndroidUtilities.bold());
+            counterView.setGravity(Gravity.CENTER);
+            counterView.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText, resourcesProvider));
+            counterView.setBackground(Theme.createRoundRectDrawable(dp(10), Theme.getColor(Theme.key_featuredStickers_addButton, resourcesProvider)));
+
+            arrowView = new ImageView(context);
+            arrowView.setImageResource(R.drawable.arrow_more);
+            arrowView.setScaleType(ImageView.ScaleType.CENTER);
+            arrowView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector, resourcesProvider), 1));
+            arrowView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText, resourcesProvider), PorterDuff.Mode.SRC_IN));
+            int padding = AndroidUtilities.dp(12);
+            arrowView.setPadding(padding, padding, padding, padding);
+            arrowView.setOnClickListener(v -> {
+                if (onArrowClick != null) {
+                    onArrowClick.run();
+                }
+            });
+
+            starsBadgeView = new ImageView(context);
+            starsBadgeView.setVisibility(View.GONE);
 
             valueView = new TextView(context);
             valueView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
             if (LocaleController.isRTL) {
+                arrowView.setScaleX(-1);
+                addView(arrowView, LayoutHelper.createLinear(48, 48, Gravity.CENTER_VERTICAL | Gravity.LEFT, 12, 0, 0, 0));
+                addView(counterView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 20, Gravity.CENTER_VERTICAL, 0, 0, 0, 0));
+                addView(starsBadgeView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 23, Gravity.CENTER_VERTICAL | Gravity.LEFT, 12, 0, 0, 0));
+
                 addView(valueView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 20, 0, 0, 0));
-                addView(textLayout, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1, Gravity.CENTER_VERTICAL | Gravity.FILL_HORIZONTAL, 20, 0, 18, 0));
-                addView(iconView, LayoutHelper.createLinear(28, 28, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 0, 0, 18, 0));
+                addView(textLayout, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1, Gravity.CENTER_VERTICAL | Gravity.FILL_HORIZONTAL, 20, 0, mini ? 12 : 18, 0));
+                addView(iconLayout, LayoutHelper.createLinear(28, 28, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 0, 0, mini ? 9 : 18, 0));
             } else {
-                addView(iconView, LayoutHelper.createLinear(28, 28, Gravity.CENTER_VERTICAL | Gravity.LEFT, 18, 0, 0, 0));
-                addView(textLayout, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1, Gravity.CENTER_VERTICAL | Gravity.FILL_HORIZONTAL, 18, 0, 20, 0));
+                addView(iconLayout, LayoutHelper.createLinear(28, 28, Gravity.CENTER_VERTICAL | Gravity.LEFT, mini ? 9 : 18, 0, 0, 0));
+                addView(textLayout, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1, Gravity.CENTER_VERTICAL | Gravity.FILL_HORIZONTAL,  mini ? 12 : 18, 0, 20, 0));
                 addView(valueView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 0, 0, 20, 0));
+
+                addView(starsBadgeView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 23, Gravity.CENTER_VERTICAL, 0, 0, 0, 0));
+                addView(counterView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 20, Gravity.CENTER_VERTICAL, 0, 0, 0, 0));
+                addView(arrowView, LayoutHelper.createLinear(48, 48, Gravity.CENTER_VERTICAL | Gravity.RIGHT, 0, 0, 12, 0));
             }
             updateColors();
         }
@@ -1564,15 +1551,20 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             CharSequence subtitle,
             CharSequence value
         ) {
-            iconView.setVisibility(icon != 0 ? View.VISIBLE : View.GONE);
+            iconLayout.setVisibility(icon != 0 ? View.VISIBLE : View.GONE);
             titleView.setTranslationX(icon == 0 ? dp(2) : 0);
             subtitleView.setTranslationX(icon == 0 ? dp(2) : 0);
 
             iconBackground.setColor(iconColorTop, iconColorBottom);
             iconView.setImageResource(icon);
+            iconView.setColorFilter(new PorterDuffColorFilter(MonetHelper.getSettingsIconForegroundColor(Color.WHITE), PorterDuff.Mode.SRC_IN));
             titleView.setText(title);
             subtitleView.setVisibility((twoLines = !TextUtils.isEmpty(subtitle)) ? View.VISIBLE : View.GONE);
             subtitleView.setText(subtitle);
+            setValue(value);
+        }
+
+        public void setValue(CharSequence value) {
             valueView.setVisibility(!TextUtils.isEmpty(value) ? View.VISIBLE : View.GONE);
             valueView.setText(value);
         }
@@ -1581,8 +1573,41 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             super.onMeasure(
                 MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.EXACTLY),
-                MeasureSpec.makeMeasureSpec(dp(twoLines ? 60 : 50), MeasureSpec.EXACTLY)
+                MeasureSpec.makeMeasureSpec(
+                        cgSettings ? 0 : dp(mini ? 44 : twoLines ? 60 : 50),
+                        cgSettings ? MeasureSpec.UNSPECIFIED : MeasureSpec.EXACTLY
+                )
             );
+
+            if (cgSettings) {
+                int lines = 0;
+                if (subtitleView.getVisibility() == View.VISIBLE) {
+                    Layout layout = subtitleView.getLayout();
+                    if (layout != null) {
+                        lines = layout.getLineCount();
+                    } else {
+                        subtitleView.measure(
+                                MeasureSpec.makeMeasureSpec(getMeasuredWidth(), MeasureSpec.AT_MOST),
+                                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+                        );
+                        lines = subtitleView.getLineCount();
+                    }
+                }
+
+                int minHeight;
+                if (lines >= 2) {
+                    minHeight = dp(65);
+                } else if (lines == 1) {
+                    minHeight = dp(60);
+                } else {
+                    minHeight = dp(50);
+                }
+
+                setMeasuredDimension(
+                        getMeasuredWidth(),
+                        Math.max(minHeight, getMeasuredHeight())
+                );
+            }
         }
 
         public static class Background extends Drawable {
@@ -1653,6 +1678,26 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                     item.subtext,
                     item.textValue
                 );
+
+                SettingCell cell = (SettingCell) view;
+                Object obj = item.object;
+
+                boolean isArchive = obj instanceof String && ((String) obj).contains("archive");
+                boolean isGifts = obj instanceof String && ((String) obj).contains("gifts");
+                boolean isRunnable = obj instanceof Runnable;
+
+                if (isRunnable) {
+                    cell.setArrow(true, () -> {
+                        ((Runnable) obj).run();
+                        adapter.update(true);
+                    });
+                } else {
+                    cell.setArrow(false, null);
+                }
+                cell.checkArrowState();
+
+                cell.setCanShowNotifications(isRunnable || isArchive || isGifts);
+                cell.checkNotifications(isArchive, isGifts);
             }
 
             public static UItem of(int id, int iconColorTop, int iconColorBottom, int icon, CharSequence title) {
@@ -1661,7 +1706,15 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             public static UItem of(int id, int iconColorTop, int iconColorBottom, int icon, CharSequence title, CharSequence subtitle) {
                 return of(id, iconColorTop, iconColorBottom, icon, title, subtitle, null);
             }
+            public static UItem of(int id, int iconColorTop, int iconColorBottom, int icon, CharSequence title, CharSequence subtitle, boolean cgSettings) {
+                SettingCell.cgSettings = cgSettings;
+                return of(id, iconColorTop, iconColorBottom, icon, title, subtitle, null);
+            }
             public static UItem of(int id, int iconColorTop, int iconColorBottom, int icon, CharSequence title, CharSequence subtitle, CharSequence value) {
+
+                iconColorTop = MonetHelper.getSettingsIconBackgroundColor(iconColorTop);
+                iconColorBottom = MonetHelper.getSettingsIconBackgroundColor(iconColorBottom);
+
                 final UItem item = UItem.ofFactory(Factory.class);
                 item.id = id;
                 item.iconResId = icon;
@@ -1671,7 +1724,124 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 item.longValue = ((long) iconColorBottom << 32) | (iconColorTop & 0xFFFFFFFFL);
                 return item;
             }
+
+            public static UItem ofBot(TLRPC.TL_attachMenuBot attachMenuBot, int iconColorTop, int iconColorBottom, int icon) {
+
+                iconColorTop = MonetHelper.getSettingsIconBackgroundColor(iconColorTop);
+                iconColorBottom = MonetHelper.getSettingsIconBackgroundColor(iconColorBottom);
+
+                final UItem item = UItem.ofFactory(Factory.class);
+                item.id = Long.hashCode(attachMenuBot.bot_id);
+                item.object = attachMenuBot;
+                item.iconResId = icon;
+                item.text = attachMenuBot.short_name;
+                item.longValue = ((long) iconColorBottom << 32) | (iconColorTop & 0xFFFFFFFFL);
+                return item;
+            }
         }
+
+        /** Cherrygram start */
+        public static boolean cgSettings = false;
+
+        private Runnable onArrowClick;
+        private final ImageView arrowView;
+        private final ImageView starsBadgeView;
+
+        private final TextView counterView;
+        private boolean canShowNotifications;
+
+        public void setArrow(boolean visible, Runnable onClick) {
+            arrowView.setVisibility(visible ? View.VISIBLE : View.GONE);
+            this.onArrowClick = onClick;
+
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) valueView.getLayoutParams();
+            if (LocaleController.isRTL) {
+                lp.leftMargin = visible ? AndroidUtilities.dp(8) : AndroidUtilities.dp(20);
+            } else {
+                lp.rightMargin = visible ? AndroidUtilities.dp(8) : AndroidUtilities.dp(20);
+            }
+        }
+
+        public void setCanShowNotifications(boolean can) {
+            this.canShowNotifications = can;
+        }
+
+        public void checkNotifications(boolean isArchive, boolean isGifts) {
+            if (!canShowNotifications) {
+                starsBadgeView.setImageDrawable(null);
+                starsBadgeView.setVisibility(View.GONE);
+                counterView.setVisibility(View.GONE);
+                return;
+            }
+
+            int totalCounter = 0;
+
+            if (isArchive || isGifts) {
+                long count;
+                boolean drawAsArchive;
+
+                if (isArchive) {
+                    count = MessagesStorage.getInstance(UserConfig.selectedAccount).getArchiveUnreadCount();
+                    drawAsArchive = true;
+                } else {
+                    count = StarsController.getInstance(UserConfig.selectedAccount).getBalance().amount;
+                    drawAsArchive = false;
+                }
+
+                if (count > 0) {
+                    StarsBadgeDrawable drawable = new StarsBadgeDrawable(getContext(), drawAsArchive, count);
+                    starsBadgeView.setImageDrawable(drawable);
+                    starsBadgeView.setVisibility(View.VISIBLE);
+
+                    updateViewMargin(starsBadgeView, dp(20));
+                } else {
+                    starsBadgeView.setImageDrawable(null);
+                    starsBadgeView.setVisibility(View.GONE);
+                }
+            } else {
+                starsBadgeView.setImageDrawable(null);
+                starsBadgeView.setVisibility(View.GONE);
+                for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+                    if (/*a == UserConfig.selectedAccount ||*/ !UserConfig.getInstance(a).isClientActivated()) {
+                        continue;
+                    }
+                    totalCounter += MessagesStorage.getInstance(a).getMainUnreadCount();
+                }
+            }
+
+            if (totalCounter > 0) {
+                counterView.setVisibility(View.VISIBLE);
+                counterView.setText(LocaleController.formatNumber(totalCounter, ','));
+            } else {
+                counterView.setVisibility(View.GONE);
+            }
+        }
+
+        private void updateViewMargin(View view, int offset) {
+            if (view.getLayoutParams() instanceof MarginLayoutParams lp) {
+                if (LocaleController.isRTL) {
+                    lp.leftMargin = offset;
+                    lp.rightMargin = 0;
+                } else {
+                    lp.rightMargin = offset;
+                    lp.leftMargin = 0;
+                }
+                view.requestLayout();
+            }
+        }
+
+        private void checkArrowState() {
+            final float rotation = CherrygramAppearanceConfig.INSTANCE.getShowAccounts() ? 180.0f : 0.0f;
+            arrowView.animate().rotation(rotation).setDuration(220).setInterpolator(CubicBezierInterpolator.EASE_OUT).start();
+            arrowView.setContentDescription(CherrygramAppearanceConfig.INSTANCE.getShowAccounts() ? getString(R.string.AccDescrHideAccounts) : getString(R.string.AccDescrShowAccounts));
+        }
+
+        public void setValueCG(CharSequence value) {
+            subtitleView.setVisibility(!TextUtils.isEmpty(value) ? View.VISIBLE : View.GONE);
+            subtitleView.setText(value);
+        }
+        /** Cherrygram finish */
+
     }
 
     public static class SuggestionCell extends LinearLayout implements Theme.Colorable {
@@ -1811,7 +1981,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 "Make Memory Dump",
                 BuildVars.DEBUG_PRIVATE_VERSION ? (SharedConfig.fastWallpaperDisabled ? "enable wallpaper shader" : "disable wallpaper shader") : null,
                 (SharedConfig.frameMetricsEnabled ? "hide frame metrics" : "show frame metrics"),
-                BuildVars.DEBUG_PRIVATE_VERSION ? (SharedConfig.shadowsInSections ? "disable shadows in settings" : "enable shadows in settings") : null
+                BuildVars.DEBUG_PRIVATE_VERSION ? (SharedConfig.shadowsInSections ? "disable shadows in settings" : "enable shadows in settings") : null,
+                BuildVars.DEBUG_PRIVATE_VERSION ? (SharedConfig.debugViewMetrics ? "disable debug view metrics" : "enable debug view metrics") : null,
         };
 
         builder.setItems(items, (dialog, which) -> {
@@ -1844,8 +2015,11 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                 getMessagesStorage().clearSentMedia();
                 SharedConfig.setNoSoundHintShowed(false);
                 SharedPreferences.Editor editor = MessagesController.getGlobalMainSettings().edit();
-                editor.remove("archivehint").remove("proximityhint").remove("archivehint_l").remove("searchpostsnew").remove("speedhint").remove("gifhint").remove("reminderhint").remove("soundHint").remove("themehint").remove("bganimationhint").remove("filterhint").remove("n_0").remove("storyprvhint").remove("storyhint").remove("storyhint2").remove("storydualhint").remove("storysvddualhint").remove("stories_camera").remove("dualcam").remove("dualmatrix").remove("dual_available").remove("archivehint").remove("askNotificationsAfter").remove("askNotificationsDuration").remove("viewoncehint").remove("voicepausehint").remove("taptostorysoundhint").remove("nothanos").remove("voiceoncehint").remove("savedhint").remove("savedsearchhint").remove("savedsearchtaghint").remove("groupEmojiPackHintShown").remove("newppsms").remove("monetizationadshint").remove("seekSpeedHintShowed").remove("unsupport_video/av01").remove("channelgifthint").remove("statusgiftpage").remove("multistorieshint").remove("channelsuggesthint").remove("trimvoicehint").remove("taptostoryhighlighthint").remove("proxycheckstatusip").remove("callmiconstart").apply();
+                editor.remove("archivehint").remove("proximityhint").remove("archivehint_l").remove("searchpostsnew").remove("speedhint").remove("gifhint").remove("reminderhint").remove("soundHint").remove("themehint").remove("bganimationhint").remove("filterhint").remove("n_0").remove("storyprvhint").remove("storyhint").remove("storyhint2").remove("storydualhint").remove("storysvddualhint").remove("stories_camera").remove("dualcam").remove("dualmatrix").remove("dual_available").remove("archivehint").remove("askNotificationsAfter").remove("askNotificationsDuration").remove("viewoncehint").remove("voicepausehint").remove("taptostorysoundhint").remove("nothanos").remove("voiceoncehint").remove("savedhint").remove("savedsearchhint").remove("savedsearchtaghint").remove("newppsms").remove("monetizationadshint").remove("seekSpeedHintShowed").remove("unsupport_video/av01").remove("statusgiftpage").remove("multistorieshint").remove("trimvoicehint").remove("taptostoryhighlighthint").remove("proxycheckstatusip").remove("callmiconstart").remove("showchattagsinfo").remove("language_showed2").remove("aihintshown").remove("savedmsgschatshint").apply();
+                HintsController.resetAll();
+                SharedPrefsHelper.cleanupAccount(currentAccount);
                 MessagesController.getEmojiSettings(currentAccount).edit().remove("featured_hidden").remove("emoji_featured_hidden").commit();
+                MessagesController.getGlobalNotificationsSettings().edit().remove("disable_sharing_learn").remove("askedAboutFSILockscreen").apply();
                 SharedConfig.textSelectionHintShows = 0;
                 SharedConfig.lockRecordAudioVideoHint = 0;
                 SharedConfig.stickersReorderingHintUsed = false;
@@ -1885,7 +2059,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             } else if (which == 8) { // ?
                 SharedConfig.toggleRoundCamera16to9();
             } else if (which == 9) { // Check app update
-                ((LaunchActivity) getParentActivity()).checkAppUpdate(true, null);
+//                ((LaunchActivity) getParentActivity()).checkAppUpdate(true, null);
+                Browser.openUrl(getContext(), "tg://update");
             } else if (which == 10) { // Read all chats
                 getMessagesStorage().readAllDialogs(-1);
             } else if (which == 11) { // Voip audio effects
@@ -2115,6 +2290,9 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             } else if (which == 40) {
                 final SharedPreferences prefs = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
                 prefs.edit().putBoolean("shadowsInSections", SharedConfig.shadowsInSections = !SharedConfig.shadowsInSections).apply();
+            } else if (which == 41) {
+                final SharedPreferences prefs = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Activity.MODE_PRIVATE);
+                prefs.edit().putBoolean("debugViewMetrics", SharedConfig.debugViewMetrics = !SharedConfig.debugViewMetrics).apply();
             }
         });
         builder.setNegativeButton(getString(R.string.Cancel), null);
@@ -2246,20 +2424,20 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
                         final TLRPC.VideoSize videoSize = photos_photo.photo.video_sizes.isEmpty() ? null : FileLoader.getClosestVideoSizeWithSize(photos_photo.photo.video_sizes, 1000);
                         user.photo = new TLRPC.TL_userProfilePhoto();
                         user.photo.photo_id = photos_photo.photo.id;
-                        if (small != null) {
+                        if (user.photo.photo_small != null && small != null && small.location != null) {
                             user.photo.photo_small = small.location;
                         }
-                        if (big != null) {
+                        if (user.photo.photo_big != null && big != null && big.location != null) {
                             user.photo.photo_big = big.location;
                         }
 
-                        if (small != null && avatar != null) {
+                        if (small != null && small.location != null && avatar != null) {
                             final File destFile = FileLoader.getInstance(currentAccount).getPathToAttach(small, true);
                             final File src = FileLoader.getInstance(currentAccount).getPathToAttach(avatar, true);
                             src.renameTo(destFile);
                             final String oldKey = avatar.volume_id + "_" + avatar.local_id + "@90_90";
                             final String newKey = small.location.volume_id + "_" + small.location.local_id + "@90_90";
-                            ImageLoader.getInstance().replaceImageInCache(oldKey, newKey, ImageLocation.getForUserOrChat(user, ImageLocation.TYPE_SMALL), false);
+                            ImageLoader.getInstance().replaceImageInCache(oldKey, newKey, ImageLocation.getForUserOrChat(currentAccount, user, ImageLocation.TYPE_SMALL), false);
                         }
 
                         if (videoSize != null && videoPath != null) {
@@ -2294,10 +2472,10 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             } else {
                 avatar = smallSize.location;
                 avatarBig = bigSize.location;
-                avatarView.setImage(ImageLocation.getForLocal(avatar), "90_90", avatarDrawable, null);
+                avatarView.setImage(ImageLocation.getForLocal(avatarBig != null ? avatarBig : avatar), avatarBig != null ? "100_100" : "90_90", avatarDrawable, null);
                 showAvatarProgress(true, false);
             }
-            actionBar.createMenu().requestLayout();
+            if (actionBar != null) actionBar.createMenu().requestLayout();
         });
     }
 
@@ -2375,7 +2553,7 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
 
     private void checkUi_menuItems() {
         FragmentFloatingButton.setAnimatedVisibility(otherItem, 1f - animatorSearchPageVisible.getFloatValue());
-        FragmentFloatingButton.setAnimatedVisibility(actionBar.getBackButton(), lerp(hasMainTabs ? 0f : 1f, 1f, animatorSearchPageVisible.getFloatValue()));
+        FragmentFloatingButton.setAnimatedVisibility(actionBar.getBackButton(), 1f);
     }
 
 
@@ -2431,4 +2609,11 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
     public boolean canParentTabsSlide(MotionEvent ev, boolean forward) {
         return isSwipeBackEnabled(ev);
     }
+
+    /** Cherrygram start */
+    public TelegramSettingsHelper telegramSettingsHelper;
+
+    private boolean hidePhoneNumber = true;
+    /** Cherrygram finish */
+
 }

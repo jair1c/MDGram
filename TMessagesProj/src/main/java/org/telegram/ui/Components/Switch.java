@@ -11,6 +11,7 @@ package org.telegram.ui.Components;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
@@ -26,11 +27,11 @@ import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.RippleDrawable;
 import android.os.Build;
-import android.os.VibrationEffect;
-import android.os.Vibrator;
 import android.util.StateSet;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.animation.Interpolator;
 
 import androidx.annotation.Keep;
 
@@ -38,7 +39,13 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.BaseCell;
 
+import me.vkryl.android.animator.BoolAnimator;
+
+import uz.unnarsx.cherrygram.core.configs.CherrygramAppearanceConfig;
+import uz.unnarsx.cherrygram.core.configs.CherrygramChatsConfig;
+
 public class Switch extends View {
+    private final BoolAnimator animatorIconVisibility = new BoolAnimator(this, CubicBezierInterpolator.EASE_OUT_QUINT, 380L, true);
 
     private RectF rectF;
 
@@ -50,6 +57,9 @@ public class Switch extends View {
     private boolean isChecked;
     private Paint paint;
     private Paint paint2;
+    private Paint paint3;
+    private Paint paint4;
+    private Paint paint5;
 
     private int drawIconType;
     private float iconProgress = 1.0f;
@@ -100,11 +110,14 @@ public class Switch extends View {
 
         paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint2 = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint3 = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint4 = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint5 = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint2.setStyle(Paint.Style.STROKE);
         paint2.setStrokeCap(Paint.Cap.ROUND);
         paint2.setStrokeWidth(AndroidUtilities.dp(2));
 
-        setHapticFeedbackEnabled(true);
+        setHapticFeedbackEnabled(!CherrygramChatsConfig.INSTANCE.getDisableVibration());
     }
 
     @Keep
@@ -235,6 +248,13 @@ public class Switch extends View {
     private void animateToCheckedState(boolean newCheckedState) {
         checkAnimator = ObjectAnimator.ofFloat(this, "progress", newCheckedState ? 1 : 0);
         checkAnimator.setDuration(200);
+
+        Interpolator interpolator = CubicBezierInterpolator.EASE_OUT_QUINT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ValueAnimator.getDurationScale() >= 1f) {
+            interpolator = CubicBezierInterpolator.EASE_OUT_BACK;
+        }
+        checkAnimator.setInterpolator(interpolator);
+
         checkAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
@@ -247,6 +267,7 @@ public class Switch extends View {
     private void animateIcon(boolean newCheckedState) {
         iconAnimator = ObjectAnimator.ofFloat(this, "iconProgress", newCheckedState ? 1 : 0);
         iconAnimator.setDuration(200);
+        iconAnimator.setInterpolator(Easings.easeInOutQuad);
         iconAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
@@ -280,6 +301,7 @@ public class Switch extends View {
         if (checked != isChecked) {
             isChecked = checked;
             if (attachedToWindow && animated) {
+                if (!CherrygramChatsConfig.INSTANCE.getDisableVibration()) vibrateChecked();
                 animateToCheckedState(checked);
             } else {
                 cancelCheckAnimator();
@@ -302,6 +324,10 @@ public class Switch extends View {
             iconDrawable = null;
         }
         invalidate();
+    }
+
+    public void setIconVisible(boolean visible, boolean animated) {
+        animatorIconVisibility.setValue(visible, animated);
     }
 
     public void setDrawIconType(int iconType, boolean animated) {
@@ -366,42 +392,43 @@ public class Switch extends View {
         invalidate();
     }
 
-    // MDGram One UI: color del track encendido — acento Material You saturado, adaptado por tema
-    // (claro→accent1_600 vívido, oscuro→accent1_500 medio). Fallback al color de tema en API<31.
-    private int oneUICheckedTrackColor() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            int res = Theme.isCurrentThemeDark() ? android.R.color.system_accent1_500 : android.R.color.system_accent1_600;
-            try {
-                return getContext().getColor(res);
-            } catch (Throwable ignore) {
-            }
-        }
-        return Theme.getColor(trackCheckedColorKey, resourcesProvider);
-    }
-
     @Override
     protected void onDraw(Canvas canvas) {
         if (getVisibility() != VISIBLE) {
             return;
         }
 
-        // MDGram: switch estilo One UI (idéntico al MDGram original) — track píldora RELLENO + thumb como
-        // círculo del color de fondo (efecto "hueco"). Proporciones relativas al tamaño del view (~37x20dp),
-        // así se ve gordito y se adapta a cualquier celda. Thumb ≈ 65% del alto, márgenes iguales.
-        int width = getMeasuredWidth();
-        int height = getMeasuredHeight();
-        float thumbRadius = height * 0.325f;
-        float pillMargin = height / 2f - thumbRadius;
-        int x = 0;
-        float y = 0;
-        float txOff = pillMargin + thumbRadius;
-        float txOn = width - pillMargin - thumbRadius;
-        int tx = (int) (txOff + (txOn - txOff) * progress);
-        int ty = height / 2;
+        int x;
+        float y;
+        int tx;
+        int width = AndroidUtilities.dp(30.5F);
+        int thumb;
+
+        if (CherrygramAppearanceConfig.INSTANCE.getOneUI_SwitchStyle()) {
+            thumb = AndroidUtilities.dp(17.5F);
+            x = (getMeasuredWidth() - width) / 2;
+            y = getMeasuredHeight() / 2 - thumb / 2;
+
+            float start = x + thumb / 2f;
+            float end = x + width - thumb / 2f;
+
+            tx = (int) (start + (end - start) * progress + AndroidUtilities.dp(isChecked ? 2 : 1));
+        } else {
+            thumb = AndroidUtilities.dp(20);
+            x = (getMeasuredWidth() - width) / 2;
+            y = (getMeasuredHeight() - AndroidUtilities.dpf2(14)) / 2;
+
+            tx = x + AndroidUtilities.dp(7) + (int) (AndroidUtilities.dp(17) * progress);
+        }
+
+        int ty = getMeasuredHeight() / 2;
 
 
         int color1;
         int color2;
+        int color3;
+        int color4;
+        int color5;
         float colorProgress;
         int r1;
         int r2;
@@ -438,8 +465,11 @@ public class Switch extends View {
             }
 
             color1 = processColor(Theme.getColor(trackColorKey, resourcesProvider));
-            // MDGram One UI: track ENCENDIDO más saturado (como el original), Material You theme-adaptive
-            color2 = processColor(oneUICheckedTrackColor());
+            color2 = processColor(Theme.getColor(trackCheckedColorKey, resourcesProvider));
+            color3 = processColor(Theme.getColor(Theme.key_alwaysWhite, resourcesProvider));
+            color4 = processColor(Theme.getColor(Theme.key_alwaysGray, resourcesProvider));
+            color5 = processColor(Theme.getColor(Theme.key_alwaysGrayDarkTheme, resourcesProvider));
+
             if (a == 0 && iconDrawable != null && lastIconColor != (isChecked ? color2 : color1)) {
                 iconDrawable.setColorFilter(new PorterDuffColorFilter(lastIconColor = (isChecked ? color2 : color1), PorterDuff.Mode.MULTIPLY));
             }
@@ -460,10 +490,29 @@ public class Switch extends View {
             color = ((alpha & 0xff) << 24) | ((red & 0xff) << 16) | ((green & 0xff) << 8) | (blue & 0xff);
             paint.setColor(color);
             paint2.setColor(color);
+            paint3.setColor(color3);
+            paint4.setColor(color4);
+            paint5.setColor(color5);
 
-            // One UI: track como píldora rellena de alto completo del view
-            rectF.set(x, y, x + width, height);
-            canvasToDraw.drawRoundRect(rectF, height / 2f, height / 2f, paint);
+            if (CherrygramAppearanceConfig.INSTANCE.getOneUI_SwitchStyle()) {
+                rectF.set(x, y, getMeasuredWidth(), getMeasuredHeight() / 2 + thumb / 2);
+                if (!isChecked) {
+                    canvasToDraw.drawRoundRect(rectF, AndroidUtilities.dpf2(11), AndroidUtilities.dpf2(11), paint4);
+                    canvasToDraw.drawCircle(tx, ty, AndroidUtilities.dpf2(11), paint4);
+
+                    if (Theme.isCurrentThemeDark() || Theme.isCurrentThemeNight()) {
+                        canvasToDraw.drawRoundRect(rectF, AndroidUtilities.dpf2(11), AndroidUtilities.dpf2(11), paint5);
+                        canvasToDraw.drawCircle(tx, ty, AndroidUtilities.dpf2(11), paint5);
+                    }
+
+                }
+                canvasToDraw.drawRoundRect(rectF, AndroidUtilities.dpf2(11), AndroidUtilities.dpf2(11), paint);
+                canvasToDraw.drawCircle(tx, ty, AndroidUtilities.dpf2(11), paint);
+            } else {
+                rectF.set(x, y, x + width, y + AndroidUtilities.dpf2(14));
+                canvasToDraw.drawRoundRect(rectF, AndroidUtilities.dpf2(7), AndroidUtilities.dpf2(7), paint);
+                canvasToDraw.drawCircle(tx, ty, AndroidUtilities.dpf2(10), paint);
+            }
 
             if (a == 0 && rippleDrawable != null) {
                 rippleDrawable.setBounds(tx - AndroidUtilities.dp(18), ty - AndroidUtilities.dp(18), tx + AndroidUtilities.dp(18), ty + AndroidUtilities.dp(18));
@@ -510,14 +559,27 @@ public class Switch extends View {
             alpha = (int) (a1 + (a2 - a1) * colorProgress);
             paint.setColor(((alpha & 0xff) << 24) | ((red & 0xff) << 16) | ((green & 0xff) << 8) | (blue & 0xff));
 
-            // One UI: thumb = círculo del color de fondo de la superficie (efecto "hueco")
-            paint.setColor(Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider));
-            canvasToDraw.drawCircle(tx, ty, thumbRadius, paint);
+            if (CherrygramAppearanceConfig.INSTANCE.getOneUI_SwitchStyle()) {
+                canvasToDraw.drawCircle(tx, ty, AndroidUtilities.dp(9.5F), paint3);
+            } else {
+                canvasToDraw.drawCircle(tx, ty, AndroidUtilities.dp(8), paint);
+            }
 
             if (a == 0) {
                 if (iconDrawable != null) {
-                    iconDrawable.setBounds(tx - iconDrawable.getIntrinsicWidth() / 2, ty - iconDrawable.getIntrinsicHeight() / 2, tx + iconDrawable.getIntrinsicWidth() / 2, ty + iconDrawable.getIntrinsicHeight() / 2);
-                    iconDrawable.draw(canvasToDraw);
+                    final float factor = animatorIconVisibility.getFloatValue();
+                    if (factor > 0) {
+                        final boolean needScale = factor < 1;
+                        if (needScale) {
+                            canvas.save();
+                            canvas.scale(factor, factor, tx, ty);
+                        }
+                        iconDrawable.setBounds(tx - iconDrawable.getIntrinsicWidth() / 2, ty - iconDrawable.getIntrinsicHeight() / 2, tx + iconDrawable.getIntrinsicWidth() / 2, ty + iconDrawable.getIntrinsicHeight() / 2);
+                        iconDrawable.draw(canvasToDraw);
+                        if (needScale) {
+                            canvas.restore();
+                        }
+                    }
                 } else if (drawIconType == 1) {
                     tx -= AndroidUtilities.dp(10.8f) - AndroidUtilities.dp(1.3f) * progress;
                     ty -= AndroidUtilities.dp(8.5f) - AndroidUtilities.dp(0.5f) * progress;
@@ -567,5 +629,11 @@ public class Switch extends View {
         info.setCheckable(true);
         info.setChecked(isChecked);
         //info.setContentDescription(isChecked ? LocaleController.getString(R.string.NotificationsOn) : LocaleController.getString(R.string.NotificationsOff));
+    }
+
+    private void vibrateChecked() {
+        try {
+            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+        } catch (Exception ignore) {}
     }
 }

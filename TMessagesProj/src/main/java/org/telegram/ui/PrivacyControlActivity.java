@@ -356,6 +356,7 @@ public class PrivacyControlActivity extends BaseFragment implements Notification
             message.from_id = new TLRPC.TL_peerUser();
             message.id = 1;
             message.fwd_from = new TLRPC.TL_messageFwdHeader();
+            message.fwd_from.date = date;
             message.fwd_from.from_name = ContactsController.formatName(currentUser.first_name, currentUser.last_name);
             message.media = new TLRPC.TL_messageMediaEmpty();
             message.out = false;
@@ -478,7 +479,7 @@ public class PrivacyControlActivity extends BaseFragment implements Notification
             ContactsController.getInstance(currentAccount).loadPrivacySettings();
         }
         if (rulesType == PRIVACY_RULES_TYPE_PHOTO) {
-            imageUpdater = new ImageUpdater(false, ImageUpdater.FOR_TYPE_USER, true);
+            imageUpdater = new ImageUpdater(true, ImageUpdater.FOR_TYPE_USER, true);
             imageUpdater.parentFragment = this;
             imageUpdater.setDelegate(this);
             TLRPC.UserFull userFull = getMessagesController().getUserFull(getUserConfig().clientUserId);
@@ -1218,7 +1219,7 @@ public class PrivacyControlActivity extends BaseFragment implements Notification
             return;
         }
         AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-        builder.setTitle(LocaleController.getString(R.string.AppName));
+        builder.setTitle(LocaleController.getString(R.string.CG_AppName));
         builder.setMessage(LocaleController.getString(R.string.PrivacyFloodControlError));
         builder.setPositiveButton(LocaleController.getString(R.string.OK), null);
         showDialog(builder.create());
@@ -1693,10 +1694,10 @@ public class PrivacyControlActivity extends BaseFragment implements Notification
                 } else {
                     builder.setMessage(LocaleController.getString(R.string.CustomHelp));
                 }
-                builder.setTitle(LocaleController.getString(R.string.AppName));
+                builder.setTitle(LocaleController.getString(R.string.CG_AppName));
                 builder.setPositiveButton(LocaleController.getString(R.string.OK), (dialogInterface, i) -> {
                     applyCurrentPrivacySettings();
-                    preferences.edit().putBoolean("privacyAlertShowed", true).commit();
+                    preferences.edit().putBoolean("privacyAlertShowed", true).apply();
                 });
                 builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
                 showDialog(builder.create());

@@ -74,6 +74,7 @@ import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.ChatActionCell;
 import org.telegram.ui.Cells.ChatMessageCell;
+import org.telegram.ui.Cells.CollapseTextCell;
 import org.telegram.ui.Cells.GraySectionCell;
 import org.telegram.ui.Cells.ShadowSectionCell;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
@@ -93,6 +94,9 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+
+import uz.unnarsx.cherrygram.core.configs.CherrygramChatsConfig;
+import uz.unnarsx.cherrygram.core.ui.MD3ListAdapter;
 
 @SuppressWarnings("JavaReflectionMemberAccess")
 public class RecyclerListView extends RecyclerView implements IBlur3Capture {
@@ -151,6 +155,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
 
     @SectionsType
     private int sectionsType;
+    private boolean skipDrawSection = false;
 
     private boolean hideIfEmpty = true;
 
@@ -1063,6 +1068,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
 
             blurredTagDrawable = factory.create(fastScroll, backgroundProvider);
             blurredTagDrawable.setPadding(dp(6));
+            blurredTagDrawable.setThickness(dp(4));
             blurredTagDrawable.setRadius(dp(14));
         }
 
@@ -1180,16 +1186,20 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                     View child = currentChildView;
                     if (onItemLongClickListener != null) {
                         if (onItemLongClickListener.onItemClick(currentChildView, currentChildPosition)) {
-                            try {
-                                child.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-                            } catch (Exception ignored) {}
+                            if (!CherrygramChatsConfig.INSTANCE.getDisableVibration()) {
+                                try {
+                                    child.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                                } catch (Exception ignored) {}
+                            }
                             child.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_LONG_CLICKED);
                         }
                     } else {
                         if (onItemLongClickListenerExtended.onItemClick(currentChildView, currentChildPosition, event.getX() - currentChildView.getX(), event.getY() - currentChildView.getY())) {
-                            try {
-                                child.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-                            } catch (Exception ignored) {}
+                            if (!CherrygramChatsConfig.INSTANCE.getDisableVibration()) {
+                                try {
+                                    child.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                                } catch (Exception ignored) {}
+                            }
                             child.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_LONG_CLICKED);
                             longPressCalled = true;
                         }
@@ -1287,9 +1297,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                                     ((TransitionDrawable) d).resetTransition();
                                 }
                             }
-                            if (Build.VERSION.SDK_INT >= 21) {
-                                selectorDrawable.setHotspot(event.getX(), event.getY());
-                            }
+                            selectorDrawable.setHotspot(event.getX(), event.getY());
                         }
                         updateSelectorState();
                     } else {
@@ -1388,7 +1396,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                 if (d instanceof TransitionDrawable) {
                     ((TransitionDrawable) d).resetTransition();
                 }
-                if (event != null && Build.VERSION.SDK_INT >= 21) {
+                if (event != null) {
                     selectorDrawable.setHotspot(event.getX(), event.getY());
                 }
             }
@@ -1586,36 +1594,6 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
             canvas.drawRect(0, top - topMargin, getWidth(), bottom + bottomMargin, backgroundPaint);
         }
     }
-    protected void drawSectionBackgroundExclusive(Canvas canvas, int fromAdapterPositionExclusive, int toAdapterPositionExclusive, int color) {
-        int top = Integer.MAX_VALUE;
-        int bottom = Integer.MIN_VALUE;
-
-        for (int i = 0; i < getChildCount(); ++i) {
-            View child = getChildAt(i);
-            if (child == null) {
-                continue;
-            }
-            int position = getChildAdapterPosition(child);
-            if (position > fromAdapterPositionExclusive && position < toAdapterPositionExclusive) {
-                top = Math.min((int) child.getY(), top);
-                bottom = Math.max((int) child.getY() + child.getHeight(), bottom);
-            } else if (position == fromAdapterPositionExclusive) {
-                top = Math.min((int) child.getY() + child.getHeight(), top);
-                bottom = Math.max((int) child.getY() + child.getHeight(), bottom);
-            } else if (position == toAdapterPositionExclusive) {
-                top = Math.min((int) child.getY(), top);
-                bottom = Math.max((int) child.getY(), bottom);
-            }
-        }
-
-        if (top < bottom) {
-            if (backgroundPaint == null) {
-                backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            }
-            backgroundPaint.setColor(color);
-            canvas.drawRect(0, top, getWidth(), bottom, backgroundPaint);
-        }
-    }
 
     protected void drawItemBackground(Canvas canvas, int adapterPosition, int color) {
         drawItemBackground(canvas, adapterPosition, -1, color);
@@ -1669,7 +1647,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
     @Override
     public void setVerticalScrollBarEnabled(boolean verticalScrollBarEnabled) {
         if (attributes != null) {
-            super.setVerticalScrollBarEnabled(verticalScrollBarEnabled);
+            super.setVerticalScrollBarEnabled(false);
         }
     }
 
@@ -1726,7 +1704,9 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
         if (selectorDrawable != null) {
             selectorDrawable.setCallback(null);
         }
-        if (selectorType == 8) {
+        if (selectorType == 100) {
+            selectorDrawable = Theme.createSimpleSelectorRoundRectDrawable(0, 0x00, 0x00, 0x00);
+        } else if (selectorType == 8) {
             selectorDrawable = Theme.createRadSelectorDrawable(color, selectorRadius, 0);
         } else if (selectorType == 9) {
             selectorDrawable = null;
@@ -1912,7 +1892,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                             int count = sectionsAdapter.getCountForSection(startSection);
 
                             int pos = sectionsAdapter.getPositionInSectionForPosition(firstVisibleItem);
-                            int sectionOffsetY = maxBottom != 0 && maxBottom < (getMeasuredHeight() - getPaddingBottom()) ? 0 : sectionOffset;
+                            int sectionOffsetY = maxBottom != 0 && maxBottom < (getMeasuredHeight() - getPaddingBottom()) ? -paddingTop : sectionOffset;
 
                             if (pos == count - 1) {
                                 int headerHeight = pinnedHeader.getHeight();
@@ -2146,9 +2126,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                         ((TransitionDrawable) d).resetTransition();
                     }
                 }
-                if (Build.VERSION.SDK_INT >= 21) {
-                    selectorDrawable.setHotspot(holder.itemView.getMeasuredWidth() / 2, holder.itemView.getMeasuredHeight() / 2);
-                }
+                selectorDrawable.setHotspot(holder.itemView.getMeasuredWidth() / 2, holder.itemView.getMeasuredHeight() / 2);
             }
             if (selectorDrawable != null && selectorDrawable.isStateful()) {
                 if (selectorDrawable.setState(getDrawableStateForSelector())) {
@@ -2269,6 +2247,9 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                                 if (emptyView != null) {
                                     emptyView.setVisibility(GONE);
                                 }
+                                if (hasSections()) {
+                                    invalidate();
+                                }
                             }
                         }).start();
                     }
@@ -2286,6 +2267,11 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
             }
             hiddenByEmptyView = true;
         }
+    }
+
+    @Override
+    public ViewPropertyAnimator animate() {
+        return super.animate();
     }
 
     protected void emptyViewUpdated(boolean shown, boolean animated) {
@@ -2436,7 +2422,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                 selectorDrawable.setVisible(true, false);
             }
         }
-        if (Build.VERSION.SDK_INT >= 21 && manageHotspot) {
+        if (manageHotspot) {
             selectorDrawable.setHotspot(x, y);
         }
     }
@@ -2722,7 +2708,10 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
         if (overlayContainer != null) {
             overlayContainer.draw(canvas);
         }
-        if (sectionsType == SECTIONS_TYPE_STICKY_HEADERS) {
+
+        if (skipDrawSection) {
+
+        } else if (sectionsType == SECTIONS_TYPE_STICKY_HEADERS) {
             if (sectionsAdapter != null && !headers.isEmpty()) {
                 for (int a = 0; a < headers.size(); a++) {
                     View header = headers.get(a);
@@ -2766,6 +2755,10 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                 canvas.restoreToCount(saveCount);
             }
         }
+    }
+
+    public void setSkipDrawSection(boolean skipDrawSection) {
+        this.skipDrawSection = skipDrawSection;
     }
 
     public void relayoutPinnedHeader() {
@@ -3174,6 +3167,16 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
             //     canvas.drawColor(0x80FF00FF);
             }
         } else {
+            for (int a = 0, N = getItemDecorationCount(); a < N; a++) {
+                ItemDecoration itemDecoration = getItemDecorationAt(a);
+                if (itemDecoration instanceof IBlur3Capture) {
+                    if (itemDecoration == sectionsItemDecoration && !canCaptureSectionsDecorator) {
+                        continue;
+                    }
+                    final IBlur3Capture capture = (IBlur3Capture) itemDecoration;
+                    capture.capture(canvas, position);
+                }
+            }
             for (int i = 0, N = getChildCount(); i < N; i++) {
                 final View child = getChildAt(i);
 
@@ -3190,15 +3193,10 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                 drawChild(canvas, child, drawingTime);
                 ignoreClipChild = false;
             }
-            for (int a = 0, N = getItemDecorationCount(); a < N; a++) {
-                ItemDecoration itemDecoration = getItemDecorationAt(a);
-                if (itemDecoration instanceof IBlur3Capture) {
-                    final IBlur3Capture capture = (IBlur3Capture) itemDecoration;
-                    capture.capture(canvas, position);
-                }
-            }
         }
     }
+
+
 
     @Override
     public void captureCalculateHash(IBlur3Hash builder, RectF position) {
@@ -3212,6 +3210,16 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
             return;
         }
 
+        for (int a = 0, N = getItemDecorationCount(); a < N; a++) {
+            ItemDecoration itemDecoration = getItemDecorationAt(a);
+            if (itemDecoration instanceof IBlur3Capture) {
+                if (itemDecoration == sectionsItemDecoration && !canCaptureSectionsDecorator) {
+                    continue;
+                }
+                final IBlur3Capture capture = (IBlur3Capture) itemDecoration;
+                capture.captureCalculateHash(builder, position);
+            }
+        }
         for (int i = 0, N = getChildCount(); i < N; i++) {
             final View child = getChildAt(i);
 
@@ -3226,14 +3234,12 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
 
             builder.add(child);
         }
+    }
 
-        for (int a = 0, N = getItemDecorationCount(); a < N; a++) {
-            ItemDecoration itemDecoration = getItemDecorationAt(a);
-            if (itemDecoration instanceof IBlur3Capture) {
-                final IBlur3Capture capture = (IBlur3Capture) itemDecoration;
-                capture.captureCalculateHash(builder, position);
-            }
-        }
+    private boolean canCaptureSectionsDecorator;
+
+    public void setCaptureSectionsDecoratorAllowed(boolean allowed) {
+        canCaptureSectionsDecorator = allowed;
     }
 
     public View findViewByPosition(int position) {
@@ -3262,6 +3268,19 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
 
     public static final int TAG_NOT_SECTION = -33024;
 
+    public void disableSections() {
+        setSelectorDrawableColor(getThemedColor(Theme.key_listSelector));
+        this.isViewTypeSection = null;
+        this.sectionRadius = 0;
+        this.sectionRadiusTop = null;
+        this.sectionRadiusBottom = null;
+        this.drawSectionBackground = null;
+        if (sectionsItemDecoration != null) {
+            removeItemDecoration(sectionsItemDecoration);
+            sectionsItemDecoration = null;
+        }
+    }
+
     public void setSections() {
         setSections(dp(12), dp(16), false);
     }
@@ -3270,7 +3289,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
     }
     public void setSections(int padding, float roundRadius, boolean topPadding) {
         setSections(
-            view -> !(view instanceof TextInfoPrivacyCell || view instanceof ShadowSectionCell || view instanceof FiltersSetupActivity.HintInnerCell || view instanceof GraySectionCell) && !Objects.equals(view.getTag(), TAG_NOT_SECTION),
+            view -> !(view instanceof TextInfoPrivacyCell || view instanceof ShadowSectionCell || view instanceof FiltersSetupActivity.HintInnerCell || view instanceof GraySectionCell || view instanceof CollapseTextCell) && !Objects.equals(view.getTag(), TAG_NOT_SECTION),
             padding,
             roundRadius,
             this::drawBackgroundRect,
@@ -3337,7 +3356,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
         if (sectionsItemDecoration != null) {
             removeItemDecoration(sectionsItemDecoration);
         }
-        addItemDecoration(sectionsItemDecoration = new ListSectionsDecoration(isSectionView, padding, topPadding));
+        addItemDecoration(sectionsItemDecoration = new ListSectionsDecoration(this, isSectionView, padding, topPadding));
 //        if (getItemAnimator() != null) {
 //            getItemAnimator().listenToAnimationUpdates(this::invalidate);
 //        }
@@ -3345,19 +3364,28 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
 
     @Override
     public void setItemAnimator(@Nullable ItemAnimator animator) {
-        super.setItemAnimator(animator);
+        try {
+            if (getItemAnimator() == animator && animator != null) {
+                return;
+            }
+            super.setItemAnimator(animator);
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
 //        if (hasSections() && getItemAnimator() != null) {
 //            getItemAnimator().listenToAnimationUpdates(this::invalidate);
 //        }
     }
 
-    public static class ListSectionsDecoration extends RecyclerView.ItemDecoration {
+    public static class ListSectionsDecoration extends RecyclerView.ItemDecoration implements IBlur3Capture {
 
         public final Utilities.CallbackReturn<View, Boolean> isSectionItem;
+        public final RecyclerListView parent;
         private int padding;
         private boolean enableTopPadding;
 
-        public ListSectionsDecoration(Utilities.CallbackReturn<View, Boolean> isSectionItem, int padding, boolean enableTopPadding) {
+        public ListSectionsDecoration(RecyclerListView parent, Utilities.CallbackReturn<View, Boolean> isSectionItem, int padding, boolean enableTopPadding) {
+            this.parent = parent;
             this.isSectionItem = isSectionItem;
             this.padding = padding;
             this.enableTopPadding = enableTopPadding;
@@ -3394,6 +3422,14 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                 ((RecyclerListView) parent).drawSectionsBackgrounds(c);
             }
         }
+
+        @Override
+        public void capture(Canvas canvas, RectF position) {
+            canvas.save();
+            canvas.clipRect(position);
+            parent.drawSectionsBackgrounds(canvas);
+            canvas.restore();
+        }
     }
 
     private void drawSectionBackground(
@@ -3410,9 +3446,9 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
 
         AndroidUtilities.rectTmp.set(
             from.getLeft(),
-            Math.max(applyPaddingToSections ? getPaddingTop() : -sectionRadius, from.getY() - (hasAbove ? sectionRadius : 0)),
+            Math.max(applyPaddingToSections ? getPaddingTop() : -sectionRadius, top(from) - (hasAbove ? sectionRadius : 0)),
             from.getRight(),
-            Math.min(getHeight() - (applyPaddingToSections ? getPaddingBottom() : -sectionRadius), to.getY() + to.getHeight() + (hasBelow ? sectionRadius : 0) - bottomMargin)
+            Math.min(getHeight() - (applyPaddingToSections ? getPaddingBottom() : -sectionRadius), bottom(to) + (hasBelow ? sectionRadius : 0) - bottomMargin)
         );
         if (AndroidUtilities.rectTmp.bottom < AndroidUtilities.rectTmp.top) return;
         drawSectionBackground.run(canvas, AndroidUtilities.rectTmp, sectionRadius, sectionRadius, from.getAlpha());
@@ -3460,8 +3496,8 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                     !sectionsItemDecoration.isSectionItem.run(child)
                 ) continue;
 
-                float from = child.getY();
-                float to = child.getY() + child.getHeight();
+                float from = top(child);
+                float to = bottom(child);
                 final ViewHolder viewHolder = getChildViewHolder(child);
                 if (viewHolder.isRemoved() && child.getAlpha() < 1) {
                     View nextStableChild = null;
@@ -3491,7 +3527,7 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                 sections.add(new SectionsDrawer.Section(from, to, child.getAlpha()));
             }
             SectionsDrawer.draw(sections, sectionRadius, (from, to, topRoundRadius, bottomRoundRadius, alpha) -> {
-                AndroidUtilities.rectTmp.set(sectionsItemDecoration.padding, from, getWidth() - sectionsItemDecoration.padding, to);
+                AndroidUtilities.rectTmp.set(getPaddingLeft() + sectionsItemDecoration.padding, from, getWidth() - sectionsItemDecoration.padding - getPaddingRight(), to);
                 drawSectionBackground.run(canvas, AndroidUtilities.rectTmp, topRoundRadius, bottomRoundRadius, alpha);
             });
             sections.clear();
@@ -3538,8 +3574,8 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                     final int position = getChildAdapterPosition(child);
 
                     if (position >= beginPosition && position <= endPosition) {
-                        from = Math.min(from, child.getY());
-                        to = Math.max(to, child.getY() + child.getHeight());
+                        from = Math.min(from, top(child));
+                        to = Math.max(to, bottom(child));
                     }
                 }
 
@@ -3568,7 +3604,11 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
         } else {
             sectionBackgroundPaint.setShadowLayer(0, 0, 0, 0);
         }
-        sectionBackgroundPaint.setColor(multAlpha(Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider), alpha));
+        if (MD3ListAdapter.shouldUseCustomColors()) {
+            sectionBackgroundPaint.setColor(MD3ListAdapter.getBackgroundColor(resourcesProvider));
+        } else {
+            sectionBackgroundPaint.setColor(multAlpha(Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider), alpha));
+        }
         if (topRadius == bottomRadius) {
             if (SharedConfig.shadowsInSections) {
                 canvas.drawRoundRect(rect, topRadius, topRadius, sectionBackgroundStrokePaint);
@@ -3607,13 +3647,13 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
 
         AndroidUtilities.rectTmp.set(
             child.getX(),
-            Math.max(applyPaddingToSections ? getPaddingTop() : -sectionRadius, child.getY()),
+            Math.max(applyPaddingToSections ? getPaddingTop() : -sectionRadius, top(child)),
             child.getX() + child.getWidth(),
-            Math.min(getHeight() - (applyPaddingToSections ? getPaddingBottom() : -sectionRadius), child.getY() + child.getHeight())
+            Math.min(getHeight() - (applyPaddingToSections ? getPaddingBottom() : -sectionRadius), bottom(child))
         );
         if (prev && next) {
-            prev = child.getY() >= AndroidUtilities.rectTmp.top;
-            next = child.getY() + child.getHeight() <= AndroidUtilities.rectTmp.bottom;
+            prev = top(child) >= AndroidUtilities.rectTmp.top;
+            next = bottom(child) <= AndroidUtilities.rectTmp.bottom;
             if (prev && next) return;
         }
         if (!prev && !next) {
@@ -3631,7 +3671,27 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
         }
     }
 
+    public static float top(View child) {
+        if (child.getTag(R.id.dragging) != null) {
+            return child.getTop();
+        } else {
+            return child.getY();
+        }
+    }
+
+    public static float bottom(View child) {
+        if (child.getTag(R.id.dragging) != null) {
+            return child.getBottom();
+        } else {
+            return child.getY() + child.getHeight();
+        }
+    }
+
     public Drawable getClipBackground(View child) {
+        return getClipBackground(child, false);
+    }
+
+    public Drawable getClipBackground(View child, boolean forceRound) {
         if (child.getParent() != this || !hasSections() || !sectionsItemDecoration.isSectionItem.run(child)) return null;
 
         boolean prev, next;
@@ -3648,17 +3708,17 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
         final RectF rect = new RectF();
         rect.set(
             child.getX(),
-            Math.max(applyPaddingToSections ? getPaddingTop() : 0, child.getY()),
+            Math.max(applyPaddingToSections ? getPaddingTop() : 0, top(child)),
             child.getX() + child.getWidth(),
-            Math.min(getHeight() - (applyPaddingToSections ? getPaddingBottom() : 0), child.getY() + child.getHeight())
+            Math.min(getHeight() - (applyPaddingToSections ? getPaddingBottom() : 0), bottom(child))
         );
-        if (prev && next) {
-            prev = child.getY() >= rect.top;
-            next = child.getY() + child.getHeight() <= rect.bottom;
+        if (prev && next && !forceRound) {
+            prev = top(child) >= rect.top;
+            next = bottom(child) <= rect.bottom;
             if (prev && next) return Theme.createRoundRectDrawable(0, Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider));
         }
         final Path clipPath = new Path();
-        if (!prev && !next) {
+        if (!prev && !next || forceRound) {
             clipPath.rewind();
             clipPath.addRoundRect(rect, sectionRadius, sectionRadius, Path.Direction.CW);
         } else if (!prev) {
@@ -3676,7 +3736,11 @@ public class RecyclerListView extends RecyclerView implements IBlur3Capture {
                 canvas.save();
                 canvas.translate(-child.getX(), -child.getY());
                 canvas.clipPath(clipPath);
-                paint.setColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider), paint.getAlpha()));
+                if (MD3ListAdapter.shouldUseCustomColors()) {
+                    paint.setColor(MD3ListAdapter.getBackgroundColor(resourcesProvider));
+                } else {
+                    paint.setColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider), paint.getAlpha()));
+                }
                 canvas.drawRect(rect, paint);
                 canvas.restore();
             }

@@ -8,12 +8,16 @@
 
 package org.telegram.ui;
 
+import static android.content.Context.ACTIVITY_SERVICE;
+
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.LocaleController.formatString;
+import static org.telegram.messenger.LocaleController.getString;
 
 import android.animation.Animator;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
@@ -51,6 +55,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BotWebViewVibrationEffect;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.CacheByChatsController;
@@ -109,7 +114,6 @@ import org.telegram.ui.Components.SlideChooseView;
 import org.telegram.ui.Components.StorageDiagramView;
 import org.telegram.ui.Components.StorageUsageView;
 import org.telegram.ui.Components.TypefaceSpan;
-import org.telegram.ui.Components.UndoView;
 import org.telegram.ui.Storage.CacheModel;
 
 import java.io.File;
@@ -118,6 +122,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Objects;
+
+import uz.unnarsx.cherrygram.core.CherrygramLogger;
+import uz.unnarsx.cherrygram.core.configs.CherrygramAppearanceConfig;
+import uz.unnarsx.cherrygram.helpers.ui.PopupHelper;
 
 public class CacheControlActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
@@ -136,6 +144,7 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
     private static final int VIEW_TYPE_SECTION_LOADING = 12;
     private static final int VIEW_TYPE_CLEAR_CACHE_BUTTON = 13;
     public static final int VIEW_TYPE_MAX_CACHE_SIZE = 14;
+    private static final int VIEW_TYPE_KABOOM = 15;
 
     public static final int KEEP_MEDIA_TYPE_USER = 0;
     public static final int KEEP_MEDIA_TYPE_GROUP = 1;
@@ -748,26 +757,30 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
         if (hasCache) {
             sectionsEndRow = itemInners.size();
             itemInners.add(new ItemInner(VIEW_TYPE_CLEAR_CACHE_BUTTON, null, null));
+            itemInners.add(new ItemInner(VIEW_TYPE_KABOOM, null, null));
             itemInners.add(ItemInner.asInfo(LocaleController.getString(R.string.StorageUsageInfo)));
         } else {
+            itemInners.add(new ItemInner(VIEW_TYPE_KABOOM, null, null));
             sectionsEndRow = -1;
         }
 
-        itemInners.add(new ItemInner(VIEW_TYPE_HEADER, LocaleController.getString(R.string.AutoDeleteCachedMedia), null));
-        itemInners.add(new ItemInner(VIEW_TYPE_KEEP_MEDIA_CELL, KEEP_MEDIA_TYPE_USER));
-        itemInners.add(new ItemInner(VIEW_TYPE_KEEP_MEDIA_CELL, KEEP_MEDIA_TYPE_GROUP));
-        itemInners.add(new ItemInner(VIEW_TYPE_KEEP_MEDIA_CELL, KEEP_MEDIA_TYPE_CHANNEL));
-        itemInners.add(new ItemInner(VIEW_TYPE_KEEP_MEDIA_CELL, KEEP_MEDIA_TYPE_STORIES));
-        itemInners.add(ItemInner.asInfo(LocaleController.getString(R.string.KeepMediaInfoPart)));
+        if (!isInKaboomMode) {
+            itemInners.add(new ItemInner(VIEW_TYPE_HEADER, LocaleController.getString(R.string.AutoDeleteCachedMedia), null));
+            itemInners.add(new ItemInner(VIEW_TYPE_KEEP_MEDIA_CELL, KEEP_MEDIA_TYPE_USER));
+            itemInners.add(new ItemInner(VIEW_TYPE_KEEP_MEDIA_CELL, KEEP_MEDIA_TYPE_GROUP));
+            itemInners.add(new ItemInner(VIEW_TYPE_KEEP_MEDIA_CELL, KEEP_MEDIA_TYPE_CHANNEL));
+            itemInners.add(new ItemInner(VIEW_TYPE_KEEP_MEDIA_CELL, KEEP_MEDIA_TYPE_STORIES));
+            itemInners.add(ItemInner.asInfo(LocaleController.getString(R.string.KeepMediaInfoPart)));
 
-        if (totalDeviceSize > 0) {
-            itemInners.add(new ItemInner(VIEW_TYPE_HEADER, LocaleController.getString(R.string.MaxCacheSize), null));
-            itemInners.add(new ItemInner(VIEW_TYPE_MAX_CACHE_SIZE));
-            itemInners.add(ItemInner.asInfo(LocaleController.getString(R.string.MaxCacheSizeInfo)));
-        }
+            if (totalDeviceSize > 0) {
+                itemInners.add(new ItemInner(VIEW_TYPE_HEADER, LocaleController.getString(R.string.MaxCacheSize), null));
+                itemInners.add(new ItemInner(VIEW_TYPE_MAX_CACHE_SIZE));
+                itemInners.add(ItemInner.asInfo(LocaleController.getString(R.string.MaxCacheSizeInfo)));
+            }
 
-        if (hasCache && cacheModel != null && !cacheModel.isEmpty()) {
-            itemInners.add(new ItemInner(VIEW_TYPE_CACHE_VIEW_PAGER, null, null));
+            if (hasCache && cacheModel != null && !cacheModel.isEmpty()) {
+                itemInners.add(new ItemInner(VIEW_TYPE_CACHE_VIEW_PAGER, null, null));
+            }
         }
 
         if (listAdapter != null) {
@@ -929,7 +942,9 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
                     entry.delete();
 
                     p[0]++;
-                    onProgress.run(p[0] / (float) count);
+                    if (onProgress != null) {
+                        onProgress.run(p[0] / (float) count);
+                    }
                 }
             }
         }
@@ -994,6 +1009,13 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
             }
             if (type == -1) {
                 continue;
+            }
+            if (a == 7) {
+                try {
+                    cleanDirJava(ApplicationLoader.getFilesDirFixed("rasterized/wallpaper").getAbsolutePath(), 0, null, null);
+                } catch (Exception e) {
+                    FileLog.e(e);
+                }
             }
             File file;
             if (a == 9) {
@@ -1180,13 +1202,17 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
         actionBar.setTitleColor(ColorUtils.setAlphaComponent(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText), 0));
         actionBar.setItemsColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText), false);
         actionBar.setItemsBackgroundColor(Theme.getColor(Theme.key_listSelector), false);
-        actionBar.setBackButtonDrawable(new BackDrawable(false));
+        BackDrawable backDrawable = new BackDrawable(false);
+        backDrawable.setShowStick(!CherrygramAppearanceConfig.INSTANCE.getCenterTitle());
+        actionBar.setBackButtonDrawable(backDrawable);
         actionBar.setAllowOverlayTitle(false);
         actionBar.setTitle(LocaleController.getString(R.string.StorageUsage));
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
-                if (id == -1) {
+                if (id == kaboom_id) {
+                    callKaboom();
+                } else if (id == -1) {
                     if (actionBar.isActionModeShowed()) {
                         if (cacheModel != null) {
                             cacheModel.clearSelection();
@@ -1253,6 +1279,10 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
             resetDatabaseItem.setSelectorColor(Theme.multAlpha(Theme.getColor(Theme.key_text_RedRegular), .12f));
         }
         updateDatabaseItemSize();
+
+        ActionBarMenuSubItem kaboomItem = otherItem.addSubItem(kaboom_id, R.drawable.msg_delete, "Kaboom");
+        kaboomItem.setIconColor(Theme.getColor(Theme.key_text_RedRegular));
+        kaboomItem.setTextColor(Theme.getColor(Theme.key_text_RedRegular));
 
         listAdapter = new ListAdapter(context);
 
@@ -1414,7 +1444,7 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
             return;
         }
 
-        bottomSheet = new DilogCacheBottomSheet(CacheControlActivity.this, entities, entities.createCacheModel(), new DilogCacheBottomSheet.Delegate() {
+        bottomSheet = new DialogCacheBottomSheet(CacheControlActivity.this, entities, entities.createCacheModel(), new DialogCacheBottomSheet.Delegate() {
             @Override
             public void onAvatarClick() {
                 bottomSheet.dismiss();
@@ -2286,6 +2316,9 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
         public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
             View view;
             switch (viewType) {
+                case VIEW_TYPE_KABOOM:
+                    view = new KaboomButtonInternal(mContext);
+                    break;
                 case VIEW_TYPE_TEXT_SETTINGS:
                     view = new TextSettingsCell(mContext);
                     break;
@@ -2456,7 +2489,7 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
                         }
                     });
                     cachedMediaLayout.setCacheModel(cacheModel);
-                    nestedSizeNotifierLayout.setChildLayout(cachedMediaLayout);
+                    nestedSizeNotifierLayout.setChildLayout(cachedMediaLayout, dp(12 + 12 + 16));
                     view.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
                     break;
                 case VIEW_TYPE_CLEAR_CACHE_BUTTON:
@@ -3128,4 +3161,112 @@ public class CacheControlActivity extends BaseFragment implements NotificationCe
         listView.setPadding(0, AndroidUtilities.statusBarHeight + ActionBar.getCurrentActionBarHeight() / 2, 0, bottom);
         listView.setClipToPadding(false);
     }
+
+    /** Cherrygram start */
+    private static final int kaboom_id = 1390;
+
+    private boolean isInKaboomMode;
+    public CacheControlActivity setInKaboomMode() {
+        this.isInKaboomMode = true;
+        return this;
+    }
+
+    public static class KaboomButton extends FrameLayout {
+        FrameLayout button;
+        AnimatedTextView.AnimatedTextDrawable textView;
+        AnimatedTextView.AnimatedTextDrawable valueTextView;
+
+        public KaboomButton(Context context) {
+            super(context);
+
+            button = new FrameLayout(context) {
+                @Override
+                protected void dispatchDraw(Canvas canvas) {
+                    final int margin = AndroidUtilities.dp(8);
+                    int x = (int) ((getMeasuredWidth() - margin - valueTextView.getCurrentWidth() + textView.getCurrentWidth()) / 2);
+
+                    if (LocaleController.isRTL) {
+                        super.dispatchDraw(canvas);
+                    } else {
+                        textView.setBounds(0, 0, x, getHeight());
+                        textView.draw(canvas);
+
+                        valueTextView.setBounds(x + AndroidUtilities.dp(8), 0, getWidth(), getHeight());
+                        valueTextView.draw(canvas);
+                    }
+                }
+
+                @Override
+                protected boolean verifyDrawable(@NonNull Drawable who) {
+                    return who == valueTextView || who == textView || super.verifyDrawable(who);
+                }
+            };
+            button.setBackground(Theme.AdaptiveRipple.filledRectByKey(Theme.key_text_RedRegular, 24));
+            ScaleStateListAnimator.apply(button, 0.02f, 1.2f);
+
+            textView = new AnimatedTextView.AnimatedTextDrawable(true, true, true);
+            textView.setAnimationProperties(.25f, 0, 300, CubicBezierInterpolator.EASE_OUT_QUINT);
+            textView.setCallback(button);
+            textView.setTextSize(AndroidUtilities.dp(14));
+            textView.setText("Kaboom");
+            textView.setGravity(Gravity.RIGHT);
+            textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+            textView.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
+
+            valueTextView = new AnimatedTextView.AnimatedTextDrawable(true, true, true);
+            valueTextView.setAnimationProperties(.25f, 0, 300, CubicBezierInterpolator.EASE_OUT_QUINT);
+            valueTextView.setCallback(button);
+            valueTextView.setTextSize(AndroidUtilities.dp(14));
+            valueTextView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+            valueTextView.setTextColor(Theme.adaptHSV(Theme.getColor(Theme.key_featuredStickers_addButton), -.46f, +.08f));
+            valueTextView.setText("");
+
+            addView(button, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.FILL, 16, 16, 16, 16));
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            super.onMeasure(
+                    MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.EXACTLY),
+                    heightMeasureSpec
+            );
+        }
+
+        public void setDisabled(boolean disabled) {
+            button.animate().cancel();
+            button.animate().alpha(disabled ? .65f : 1f).start();
+            button.setClickable(!disabled);
+        }
+    }
+
+    private class KaboomButtonInternal extends KaboomButton {
+
+        public KaboomButtonInternal(Context context) {
+            super(context);
+            ((MarginLayoutParams) button.getLayoutParams()).topMargin = AndroidUtilities.dp(5);
+            button.setOnClickListener(v -> callKaboom());
+        }
+
+    }
+
+    private void callKaboom() {
+        PopupHelper.showWarning(
+                getContext(),
+                R.raw.group_pip_delete_icon, //ic_delete // swipe_delete // chat_audio_record_delete_3
+                getString(R.string.Warning),
+                AndroidUtilities.replaceTags(getString(R.string.CG_Kaboom)),
+                "Kaboom!",
+                isInKaboomMode ? 1 : 5,
+                true,
+                () -> {
+                    try {
+                        ((ActivityManager) getContext().getSystemService(ACTIVITY_SERVICE)).clearApplicationUserData();
+                    } catch (Exception e) {
+                        CherrygramLogger.e(e);
+                    }
+                }
+        );
+    }
+    /** Cherrygram finish */
+
 }

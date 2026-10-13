@@ -18,6 +18,8 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.ui.ActionBar.Theme;
 
+import uz.unnarsx.cherrygram.core.configs.CherrygramChatsConfig;
+
 public class ColoredImageSpan extends ReplacementSpan {
 
     public boolean draw = true;
@@ -25,6 +27,7 @@ public class ColoredImageSpan extends ReplacementSpan {
     public Drawable drawable;
     public boolean recolorDrawable = true;
 
+    boolean ignorePaintAlpha = false;
     boolean usePaintColor = true;
     public boolean useLinkPaintColor = false;
     int colorKey;
@@ -54,6 +57,11 @@ public class ColoredImageSpan extends ReplacementSpan {
 
     public ColoredImageSpan(int imageRes, int verticalAlignment) {
         this(ContextCompat.getDrawable(ApplicationLoader.applicationContext, imageRes).mutate(), verticalAlignment);
+    }
+
+    public ColoredImageSpan(Drawable drawable, boolean ignorePaintTextAlpha) {
+        this(drawable, ALIGN_DEFAULT);
+        this.ignorePaintAlpha = ignorePaintTextAlpha;
     }
 
     public ColoredImageSpan(Drawable drawable, int verticalAlignment) {
@@ -168,10 +176,9 @@ public class ColoredImageSpan extends ReplacementSpan {
             if (rotate != 1f) {
                 canvas.rotate(rotate, drawable.getBounds().centerX(), drawable.getBounds().centerY());
             }
-            if (drawableColorIsPaintColor) {
-                drawable.setAlpha((int) (0xFF * alpha * (paint.getAlpha() / (float) Color.alpha(drawableColor))));
-            } else {
-                drawable.setAlpha((int) (paint.getAlpha() * alpha));
+            if (alpha != 1f || paint.getAlpha() != 0xFF && !ignorePaintAlpha) {
+                var multiplier = ignorePaintAlpha ? 255 : paint.getAlpha();
+                drawable.setAlpha((int) (alpha * multiplier));
             }
             drawable.draw(canvas);
         }

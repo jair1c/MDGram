@@ -8,7 +8,6 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -58,12 +57,14 @@ import com.google.android.gms.vision.Frame;
 import com.google.android.gms.vision.barcode.Barcode;
 import com.google.android.gms.vision.barcode.BarcodeDetector;
 import com.google.zxing.BinaryBitmap;
+import com.google.zxing.DecodeHintType;
 import com.google.zxing.LuminanceSource;
 import com.google.zxing.PlanarYUVLuminanceSource;
 import com.google.zxing.RGBLuminanceSource;
 import com.google.zxing.Result;
 import com.google.zxing.ResultPoint;
 import com.google.zxing.common.GlobalHistogramBinarizer;
+import com.google.zxing.common.HybridBinarizer;
 import com.google.zxing.qrcode.QRCodeReader;
 
 import org.telegram.messenger.AndroidUtilities;
@@ -96,8 +97,8 @@ import org.telegram.ui.Components.URLSpanNoUnderline;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Hashtable;
 
-@TargetApi(18)
 public class CameraScanActivity extends BaseFragment {
 
     private TextView titleTextView;
@@ -277,9 +278,7 @@ public class CameraScanActivity extends BaseFragment {
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
         destroy(false, null);
-        if (getParentActivity() != null) {
-            getParentActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
-        }
+        AndroidUtilities.unlockOrientation(getParentActivity());
         if (visionQrReader != null) {
             visionQrReader.release();
         }
@@ -507,7 +506,7 @@ public class CameraScanActivity extends BaseFragment {
             viewGroup.addView(actionBar);
         }
 
-        if (currentType == TYPE_QR_LOGIN || currentType == TYPE_QR_WEB_BOT) {
+        if (currentType == TYPE_QR_LOGIN || currentType == TYPE_QR_WEB_BOT || currentType == TYPE_QR_UNIVERSAL) {
             actionBar.setTitle(LocaleController.getString(R.string.AuthAnotherClientScan));
         }
 
@@ -618,9 +617,14 @@ public class CameraScanActivity extends BaseFragment {
         } else {
             if (needGalleryButton) {
                 //titleTextView.setText(LocaleController.getString(R.string.WalletScanCode));
+                if (currentType == TYPE_QR_UNIVERSAL) {
+                    titleTextView.setText("");
+                }
             } else {
                 if (currentType == TYPE_QR || currentType == TYPE_QR_WEB_BOT) {
                     titleTextView.setText(LocaleController.getString(R.string.AuthAnotherClientScan));
+                } else if (currentType == TYPE_QR_UNIVERSAL) {
+                    titleTextView.setText("");
                 } else {
                     String text = LocaleController.getString(R.string.AuthAnotherClientInfo5);
                     SpannableStringBuilder spanned = new SpannableStringBuilder(text);
@@ -704,9 +708,10 @@ public class CameraScanActivity extends BaseFragment {
                                         Bitmap bitmap = ImageLoader.loadBitmap(info.path, null, screenSize.x, screenSize.y, true);
                                         QrResult res = tryReadQr(null, null, 0, 0, 0, bitmap);
                                         if (res != null) {
-                                            if (delegate != null) {
+                                            /*if (delegate != null) {
                                                 delegate.didFindQr(res.text);
-                                            }
+                                            }*/
+                                            processShot(bitmap);
                                             removeSelfFromStack();
                                         }
                                     }
@@ -771,9 +776,7 @@ public class CameraScanActivity extends BaseFragment {
             });
         }
 
-        if (getParentActivity() != null) {
-            getParentActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-        }
+        AndroidUtilities.lockOrientation(getParentActivity(), ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         fragmentView.setKeepScreenOn(true);
 
         return fragmentView;
@@ -949,8 +952,8 @@ public class CameraScanActivity extends BaseFragment {
         if (normalBounds == null) {
             normalBounds = new RectF();
         }
-        int width = Math.max(AndroidUtilities.displaySize.x, fragmentView.getWidth()),
-            height = Math.max(AndroidUtilities.displaySize.y, fragmentView.getHeight()),
+        int width = fragmentView.getWidth(),
+            height = fragmentView.getHeight(),
             side = (int) (Math.min(width, height) / 1.5f);
         normalBounds.set(
             (width - side) / 2f / (float) width,
@@ -1055,8 +1058,10 @@ public class CameraScanActivity extends BaseFragment {
     private float averageProcessTime = 0;
     private long processTimesCount = 0;
     public void processShot(Bitmap bitmap) {
-        if (cameraView == null) {
-            return;
+        if (!needGalleryButton) {
+            if (cameraView == null) {
+                return;
+            }
         }
         final long from = SystemClock.elapsedRealtime();
         try {
@@ -1247,7 +1252,7 @@ public class CameraScanActivity extends BaseFragment {
                 } else {
                     frame = new Frame.Builder().setImageData(ByteBuffer.wrap(data), size.getWidth(), size.getHeight(), ImageFormat.NV21).build();
                     width = size.getWidth();
-                    height = size.getWidth();
+                    height = size.getHeight();
                 }
                 SparseArray<Barcode> codes = visionQrReader.detect(frame);
                 if (codes != null && codes.size() > 0) {
@@ -1342,7 +1347,11 @@ public class CameraScanActivity extends BaseFragment {
                     height = size.getHeight();
                 }
 
-                Result result = qrReader.decode(new BinaryBitmap(new GlobalHistogramBinarizer(source)));
+                Hashtable<DecodeHintType, Object> hints = new java.util.Hashtable<>();
+                hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
+
+                BinaryBitmap binaryBitmap = new BinaryBitmap(new HybridBinarizer(source));
+                Result result = qrReader.decode(binaryBitmap, hints);
                 if (result == null) {
                     onNoQrFound();
                     return null;
@@ -1379,11 +1388,9 @@ public class CameraScanActivity extends BaseFragment {
                 onNoQrFound();
                 return null;
             }
-            if (needGalleryButton) {
-                Uri uri = Uri.parse(text);
-                String path = uri.getPath().replace("/", "");
-            } else {
-                if (currentType == TYPE_QR_LOGIN && !text.startsWith("tg://login?token=")) {
+
+            if (currentType == TYPE_QR_LOGIN) {
+                if (!text.startsWith("tg://login?token=") && !text.startsWith("https://t.me/login?token=")) {
                     onNoQrFound();
                     return null;
                 }
@@ -1410,7 +1417,7 @@ public class CameraScanActivity extends BaseFragment {
 
 
     private boolean isQr() {
-        return currentType == TYPE_QR || currentType == TYPE_QR_LOGIN || currentType == TYPE_QR_WEB_BOT;
+        return currentType == TYPE_QR || currentType == TYPE_QR_LOGIN || currentType == TYPE_QR_WEB_BOT || currentType == TYPE_QR_UNIVERSAL;
     }
 
     @Override
@@ -1431,4 +1438,9 @@ public class CameraScanActivity extends BaseFragment {
 
         return themeDescriptions;
     }
+
+    /** Cherrygram start */
+    public static final int TYPE_QR_UNIVERSAL = 1390;
+    /** Cherrygram finish */
+
 }

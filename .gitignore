@@ -1,7 +1,11 @@
 .idea/
 .gradle/
+.cxx/
+afat/
 build/
 obj/
+TMessagesProj/jni/colorado
+TMessagesProj/jni/security
 *.iml
 local.properties
 TMessagesProj/.cxx/
@@ -13,21 +17,18 @@ TMessagesProj_App/afat/
 TMessagesProj_AppHockeyApp/afat/
 TMessagesProj_AppStandalone/afat/
 TMessagesProj_AppHuawei/afat/
-
-# MDGram: firma de release — nunca subir credenciales ni la keystore propia
+Keytool.zip
+Cherrygram.jks
+mykey.jks
+actions-runner
+secrets_for_ci.env
+MDGRAM_CREDENTIALS.local.md
 keystore.properties
 *.jks
+*.keystore
+TMessagesProj/jni/ffmpeg/build_android
+.mdgram_backup/
+.test-artifacts/
 
-# MDGram: config Firebase (heredada de NekoX) — no se publica; cada quien pone la suya
-google-services.json
-
-# MDGram: logs de build + notas internas de desarrollo — no van al repo público
-build_mdgram*.log
-*.log
-*.bat
-build_log.txt
+## Local session journal; public documentation is PROJECT_STATUS/RELEASE_NOTES.
 SESSION_NOTES.md
-
-# MDGram: tooling/scratchpads locales de desarrollo (scripts Python, clones dispersos)
-scratchpad/
-scratchpad_bubbles/

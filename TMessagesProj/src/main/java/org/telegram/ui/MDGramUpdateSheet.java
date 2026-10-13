@@ -173,7 +173,8 @@ public class MDGramUpdateSheet {
 
                 @Override
                 public void onError(String error) {
-                    downloadingLabel.setText("Error al descargar. Toca Reintentar.");
+                    downloadingLabel.setText("No se pudo instalar: " + error);
+                    Toast.makeText(act, "Actualización rechazada: " + error, Toast.LENGTH_LONG).show();
                     progressBox.setVisibility(View.GONE);
                     actions.setVisibility(View.VISIBLE);
                     installBtn.setText("Reintentar");

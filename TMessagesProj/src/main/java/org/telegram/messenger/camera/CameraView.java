@@ -53,7 +53,6 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
@@ -68,7 +67,6 @@ import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
-import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.video.MP4Builder;
 import org.telegram.messenger.video.MediaCodecVideoConvertor;
@@ -97,10 +95,15 @@ import javax.microedition.khronos.egl.EGLContext;
 import javax.microedition.khronos.egl.EGLDisplay;
 import javax.microedition.khronos.egl.EGLSurface;
 
+import uz.unnarsx.cherrygram.camera.BaseCameraView;
+import uz.unnarsx.cherrygram.core.configs.CherrygramCameraConfig;
+import uz.unnarsx.cherrygram.misc.CherrygramExtras;
+
 @SuppressLint("NewApi")
-public class CameraView extends FrameLayout implements TextureView.SurfaceTextureListener, CameraController.ICameraView, CameraController.ErrorCallback  {
+public class CameraView extends BaseCameraView implements TextureView.SurfaceTextureListener, CameraController.ICameraView, CameraController.ErrorCallback  {
 
     public boolean WRITE_TO_FILE_IN_BACKGROUND = false;
+    private boolean largePhotos = CherrygramExtras.largePhotosSupported();
 
     public boolean isStory;
     public boolean recordHevc;
@@ -122,7 +125,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     private int focusAreaSize;
     private Drawable thumbDrawable;
 
-    private final boolean useCamera2 = false && SharedConfig.isUsingCamera2(UserConfig.selectedAccount);
+    private final boolean useCamera2 = CherrygramCameraConfig.INSTANCE.getCameraType() == CherrygramCameraConfig.CAMERA_2;
     private final CameraSessionWrapper[] cameraSession = new CameraSessionWrapper[2];
     private CameraSessionWrapper cameraSessionRecording;
 
@@ -193,7 +196,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
         if (firstFrameRendered) {
             Bitmap bitmap = textureView.getBitmap(100, 100);
             if (bitmap != null) {
-                Utilities.blurBitmap(bitmap, 3, 1, bitmap.getWidth(), bitmap.getHeight(), bitmap.getRowBytes());
+                Utilities.blurBitmap(bitmap, 3);
                 Drawable drawable = new BitmapDrawable(bitmap);
                 blurredStubView.setBackground(drawable);
             }
@@ -401,7 +404,15 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     }
 
     public CameraView(Context context, boolean frontface, boolean lazy) {
+        this(context, frontface, lazy, false);
+    }
+
+    public CameraView(Context context, boolean frontface, boolean lazy, boolean story) {
         super(context, null);
+
+        this.isStory = story;
+
+        setBackgroundColor(Color.BLACK);
 
         CameraController.getInstance().addOnErrorListener(this);
 
@@ -489,7 +500,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     }
 
     private int lastWidth = -1, lastHeight = -1;
-    public boolean fit;
+    public boolean fit = true;
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int width = MeasureSpec.getSize(widthMeasureSpec),
@@ -508,7 +519,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
                 frameHeight = previewSize[0].getWidth();
             }
             float s;
-            if (fit) {
+            if (fit && !isStory) {
                 s = Math.min(width / (float) frameWidth, height / (float) frameHeight);
             } else {
                 s = Math.max(width / (float) frameWidth, height / (float) frameHeight);
@@ -751,8 +762,25 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
             aspectRatio = new Size(16, 9);
             photoMaxWidth = wantedWidth = 1280;
             photoMaxHeight = wantedHeight = 720;
+
         } else {
-            if (Math.abs(screenSize - size4to3) < 0.1f) {
+            if (CherrygramCameraConfig.INSTANCE.getCameraAspectRatio() == CherrygramCameraConfig.Camera1to1 && !isStory) {
+                aspectRatio = new Size(1, 1);
+                wantedWidth = 1080;
+                wantedHeight = 1080;
+
+                if (SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_LOW) {
+                    photoMaxWidth = 720;
+                    photoMaxHeight = 720;
+                } else if (largePhotos) {
+                    photoMaxWidth = 2560;
+                    photoMaxHeight = 2560;
+                } else {
+                    photoMaxWidth = 1080;
+                    photoMaxHeight = 1080;
+                }
+
+            } else if (CherrygramCameraConfig.INSTANCE.getCameraAspectRatio() == CherrygramCameraConfig.Camera4to3 && !isStory) {
                 aspectRatio = new Size(4, 3);
                 wantedWidth = 1280;
                 wantedHeight = 960;
@@ -760,11 +788,15 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
                 if (SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_LOW) {
                     photoMaxWidth = 1280;
                     photoMaxHeight = 960;
+                } else if (largePhotos) {
+                    photoMaxWidth = 2560;
+                    photoMaxHeight = 1920;
                 } else {
                     photoMaxWidth = 1920;
                     photoMaxHeight = 1440;
                 }
-            } else {
+
+            } else if (CherrygramCameraConfig.INSTANCE.getCameraAspectRatio() == CherrygramCameraConfig.Camera16to9 && !isStory) {
                 aspectRatio = new Size(16, 9);
                 wantedWidth = 1280;
                 wantedHeight = 720;
@@ -772,9 +804,45 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
                 if (SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_LOW) {
                     photoMaxWidth = 1280;
                     photoMaxHeight = 960;
+                } else if (largePhotos) {
+                    photoMaxWidth = 2560;
+                    photoMaxHeight = 1440;
                 } else {
                     photoMaxWidth = isStory ? 1280 : 1920;
                     photoMaxHeight = isStory ? 720 : 1080;
+                }
+
+            } else {
+                if (Math.abs(screenSize - size4to3) < 0.1f) {
+                    aspectRatio = new Size(4, 3);
+                    wantedWidth = 1280;
+                    wantedHeight = 960;
+
+                    if (SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_LOW) {
+                        photoMaxWidth = 1280;
+                        photoMaxHeight = 960;
+                    } else if (largePhotos) {
+                        photoMaxWidth = 2560;
+                        photoMaxHeight = 1920;
+                    } else {
+                        photoMaxWidth = 1920;
+                        photoMaxHeight = 1440;
+                    }
+                } else {
+                    aspectRatio = new Size(16, 9);
+                    wantedWidth = 1280;
+                    wantedHeight = 720;
+
+                    if (SharedConfig.getDevicePerformanceClass() == SharedConfig.PERFORMANCE_CLASS_LOW) {
+                        photoMaxWidth = 1280;
+                        photoMaxHeight = 960;
+                    } else if (largePhotos) {
+                        photoMaxWidth = 2560;
+                        photoMaxHeight = 1440;
+                    } else {
+                        photoMaxWidth = isStory ? 1280 : 1920;
+                        photoMaxHeight = isStory ? 720 : 1080;
+                    }
                 }
             }
         }

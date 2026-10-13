@@ -47,6 +47,7 @@ import androidx.annotation.Nullable;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.AnimationNotificationsLocker;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
@@ -158,9 +159,15 @@ public class ActionBarPopupWindow extends PopupWindow {
         }
 
         public ActionBarPopupWindowLayout(Context context, int resId, Theme.ResourcesProvider resourcesProvider, int flags) {
+            this(context, resId, resourcesProvider, flags, false, 0);
+        }
+
+        public ActionBarPopupWindowLayout(Context context, int resId, Theme.ResourcesProvider resourcesProvider, int flags, boolean roundy, int cornerRadius) {
             super(context);
             this.resourcesProvider = resourcesProvider;
 
+            this.rounded_corners = roundy;
+            this.cornerRadius = cornerRadius;
             if (resId != 0) {
                 backgroundDrawable = getResources().getDrawable(resId).mutate();
                 setPadding(dp(8), dp(8), dp(8), dp(8));
@@ -168,6 +175,9 @@ public class ActionBarPopupWindow extends PopupWindow {
             if (backgroundDrawable != null) {
                 backgroundDrawable.getPadding(bgPaddings);
                 setBackgroundColor(getThemedColor(Theme.key_actionBarDefaultSubmenuBackground));
+            }
+            if (rounded_corners) {
+                roundedBackgroundPaint.setColor(getThemedColor(Theme.key_actionBarDefaultSubmenuBackground));
             }
 
 
@@ -295,6 +305,9 @@ public class ActionBarPopupWindow extends PopupWindow {
             if (backgroundColor != color && backgroundDrawable != null) {
                 backgroundDrawable.setColorFilter(new PorterDuffColorFilter(backgroundColor = color, PorterDuff.Mode.MULTIPLY));
             }
+            if (rounded_corners) {
+                roundedBackgroundPaint.setColor(backgroundColor);
+            }
         }
 
         @Keep
@@ -374,6 +387,9 @@ public class ActionBarPopupWindow extends PopupWindow {
             backgroundDrawable = drawable;
             if (backgroundDrawable != null) {
                 backgroundDrawable.getPadding(bgPaddings);
+            }
+            if (rounded_corners && drawable != null && drawable.getColorFilter() instanceof PorterDuffColorFilter f1) {
+                roundedBackgroundPaint.setColorFilter(f1);
             }
         }
 
@@ -487,7 +503,11 @@ public class ActionBarPopupWindow extends PopupWindow {
                         canvas.save();
                         canvas.clipRect(0, bgPaddings.top, getMeasuredWidth(), getMeasuredHeight());
                     }
-                    backgroundDrawable.setAlpha(applyAlpha ? backAlpha : 255);
+                    if (rounded_corners) {
+                        roundedBackgroundPaint.setAlpha(applyAlpha ? backAlpha : 255);
+                    } else {
+                        backgroundDrawable.setAlpha(applyAlpha ? backAlpha : 255);
+                    }
                     if (shownFromBottom) {
                         final int height = getMeasuredHeight();
                         AndroidUtilities.rectTmp2.set(0, (int) (height * (1.0f - backScaleY)), (int) (getMeasuredWidth() * backScaleX), height);
@@ -528,8 +548,14 @@ public class ActionBarPopupWindow extends PopupWindow {
                         rect.set(AndroidUtilities.rectTmp2.right, AndroidUtilities.rectTmp2.top, AndroidUtilities.rectTmp2.right, AndroidUtilities.rectTmp2.top);
                         AndroidUtilities.lerp(rect, AndroidUtilities.rectTmp2, reactionsEnterProgress, AndroidUtilities.rectTmp2);
                     }
-                    backgroundDrawable.setBounds(AndroidUtilities.rectTmp2);
-                    backgroundDrawable.draw(canvas);
+                    if (rounded_corners) {
+                        var pd = dp(cornerRadius != 0 ? cornerRadius : 12);
+                        canvas.drawRoundRect(AndroidUtilities.rectTmp2.left + bgPaddings.left, AndroidUtilities.rectTmp2.top + bgPaddings.top, AndroidUtilities.rectTmp2.right - bgPaddings.right, AndroidUtilities.rectTmp2.bottom - bgPaddings.top, pd, pd, roundedBackgroundPaint);
+                        backgroundDrawable.setBounds(AndroidUtilities.rectTmp2);
+                    } else {
+                        backgroundDrawable.setBounds(AndroidUtilities.rectTmp2);
+                        backgroundDrawable.draw(canvas);
+                    }
                     if (clipChildren) {
                         AndroidUtilities.rectTmp2.left += bgPaddings.left;
                         AndroidUtilities.rectTmp2.top += bgPaddings.top;
@@ -678,6 +704,16 @@ public class ActionBarPopupWindow extends PopupWindow {
             this.reactionsEnterProgress = transitionEnterProgress;
             invalidate();
         }
+
+        /** Cherrygram start */
+        private final boolean rounded_corners;
+        private final int cornerRadius;
+        private final Paint roundedBackgroundPaint = new Paint();
+
+        public LinearLayout getLinearLayout() {
+            return linearLayout;
+        }
+        /** Cherrygram finish */
     }
 
     public ActionBarPopupWindow() {
@@ -1116,7 +1152,7 @@ public class ActionBarPopupWindow extends PopupWindow {
         }
 
         public GapView(Context context, int color, int shadowColor) {
-            super(context);
+            super(context != null ? context : ApplicationLoader.applicationContext);
             this.shadowDrawable = Theme.getThemedDrawable(getContext(), R.drawable.greydivider, shadowColor);
             setBackgroundColor(color);
         }

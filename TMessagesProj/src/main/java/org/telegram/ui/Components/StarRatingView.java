@@ -1,6 +1,7 @@
 package org.telegram.ui.Components;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
+import static org.telegram.messenger.LocaleController.getString;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -13,8 +14,11 @@ import androidx.core.graphics.ColorUtils;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.R;
 import org.telegram.tgnet.tl.TL_stars;
 import org.telegram.ui.ActionBar.Theme;
+
+import uz.unnarsx.cherrygram.core.configs.CherrygramAppearanceConfig;
 
 public class StarRatingView extends View {
     private final BadgeLevelDrawable drawable;
@@ -60,6 +64,7 @@ public class StarRatingView extends View {
         }
 
         drawable.setBadgeLevel(starsRating.level, true);
+        setContentDescription(getString(R.string.AccDescrProfileRatingLevel) + " " + starsRating.level);
         invalidate();
     }
 
@@ -176,11 +181,20 @@ public class StarRatingView extends View {
     }
 
     public static int getTabsViewBackgroundColor(Theme.ResourcesProvider resourcesProvider, int color1, int color2) {
-        final int bgColor = ColorUtils.blendARGB(color1, color2, .75f);
-        final boolean bgColorIsLight = AndroidUtilities.computePerceivedBrightness(bgColor) > .721f;
+        if (CherrygramAppearanceConfig.INSTANCE.getProfileBackgroundColor()) {
+            return (ColorUtils.blendARGB(0x24000000,
+                    AndroidUtilities.computePerceivedBrightness(ColorUtils.blendARGB(color1, color2, .75f)) > .721f ?
+                            Theme.getColor(Theme.key_windowBackgroundWhiteBlueIcon, resourcesProvider) :
+                            Theme.adaptHSV(ColorUtils.blendARGB(color1, color2, .75f), +.08f, -.08f),
+                    1f
+            ));
+        } else {
+            final int bgColor = ColorUtils.blendARGB(color1, color2, .75f);
+            final boolean bgColorIsLight = AndroidUtilities.computePerceivedBrightness(bgColor) > .721f;
 
-        return bgColorIsLight ?
-            Theme.getColor(Theme.key_windowBackgroundWhiteBlueIcon, resourcesProvider) :
-            Theme.adaptHSV(bgColor, +.08f, -.08f);
+            return bgColorIsLight ?
+                    Theme.getColor(Theme.key_windowBackgroundWhiteBlueIcon, resourcesProvider) :
+                    Theme.adaptHSV(bgColor, +.08f, -.08f);
+        }
     }
 }

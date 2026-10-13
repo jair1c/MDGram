@@ -25,15 +25,19 @@ import org.telegram.ui.LaunchActivity;
 
 import java.util.ArrayList;
 
+import uz.unnarsx.cherrygram.core.configs.CherrygramAppearanceConfig;
+
 public abstract class UniversalFragment extends BaseFragment {
 
     public UniversalRecyclerView listView;
 
     @Override
     public View createView(Context context) {
-        actionBar.setBackButtonDrawable(new BackDrawable(false));
+        BackDrawable backDrawable = new BackDrawable(false);
+        backDrawable.setShowStick(!CherrygramAppearanceConfig.INSTANCE.getCenterTitle());
+        actionBar.setBackButtonDrawable(backDrawable);
         actionBar.setAllowOverlayTitle(true);
-        actionBar.setTitle(getTitle());
+        actionBar.setTitle(getTitle(), null, isGilroyEnabled);
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
@@ -67,6 +71,13 @@ public abstract class UniversalFragment extends BaseFragment {
                 savedScrollPosition = -1;
             }
         };
+
+        if (isMD3Enabled) {
+            listView.setSections(true);
+            listView.adapter.setApplyBackground(false);
+            actionBar.setAdaptiveBackground(listView);
+        }
+
         contentView.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
         return fragmentView = contentView;
@@ -110,4 +121,18 @@ public abstract class UniversalFragment extends BaseFragment {
             listView.layoutManager.scrollToPositionWithOffset(savedScrollPosition, savedScrollOffset - listView.getPaddingTop());
         }
     }
+
+    /** Cherrygram start */
+    private boolean isMD3Enabled = false;
+    private boolean isGilroyEnabled = false;
+
+    public void setMD3(boolean set) {
+        this.isMD3Enabled = set;
+    }
+
+    public void setGilroy(boolean set) {
+        this.isGilroyEnabled = set;
+    }
+    /** Cherrygram finish */
+
 }

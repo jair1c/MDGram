@@ -47,7 +47,7 @@ public class VersionInfoActivity extends BaseFragment {
         layout.setGravity(Gravity.CENTER_HORIZONTAL);
 
         ImageView iconView = new ImageView(context);
-        iconView.setImageResource(R.mipmap.icon_foreground_sa);
+        iconView.setImageResource(R.drawable.mdgram_icon_3tone);
         ColorMatrix matrix = new ColorMatrix();
         matrix.setSaturation(0f);
         iconView.setColorFilter(new ColorMatrixColorFilter(matrix));

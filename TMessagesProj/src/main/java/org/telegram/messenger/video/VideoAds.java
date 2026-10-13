@@ -75,6 +75,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
 
+import uz.unnarsx.cherrygram.core.configs.CherrygramCoreConfig;
+
 public class VideoAds {
 
     private final int currentAccount;
@@ -110,6 +112,11 @@ public class VideoAds {
 
 //    private static LruCache<VideoAdsLocation, VideoAds> cached = new LruCache<>(3);
     private static HashMap<VideoAdsLocation, VideoAds> cached = new HashMap<>();
+
+    public static void dropCache() {
+        cached.clear();
+    }
+
     public static VideoAds make(
         int currentAccount,
         long dialogId,
@@ -242,6 +249,21 @@ public class VideoAds {
     private void show() {
         if (ads.isEmpty()) return;
         final TLRPC.TL_sponsoredMessage ad = ads.get(0);
+
+        boolean hide;
+        if (CherrygramCoreConfig.isStandalonePremiumBuild()) {
+            hide = true;
+        } else {
+            int num = Utilities.random.nextInt(2);
+            hide = num == 1 && (ApplicationLoader.isStandaloneBuild() || CherrygramCoreConfig.isDevBuild());
+        }
+        if (UserConfig.getInstance(currentAccount).isPremium()) hide = false;
+
+        if (hide) {
+            logSponsoredShown(ad);
+            return;
+        }
+
         final long showTime = System.currentTimeMillis() - currentBulletinPassedTime;
         bulletinShowTime = showTime;
 
@@ -841,7 +863,7 @@ public class VideoAds {
 
         public void hideImage() {
             imageView.setVisibility(GONE);
-            ((MarginLayoutParams) linearLayout.getLayoutParams()).setMarginStart(dp(10));
+            linearLayout.setLayoutParams(LayoutHelper.createFrameRelatively(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.START | Gravity.CENTER_VERTICAL, 10, 8, 54, 8));
         }
     }
 

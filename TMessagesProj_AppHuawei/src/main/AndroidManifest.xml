@@ -5,12 +5,17 @@
 
     <uses-permission android:name="com.huawei.appmarket.service.commondata.permission.GET_COMMON_DATA"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
 
     <queries>
         <package android:name="com.huawei.maps.app"/>
     </queries>
 
-    <application android:name="org.telegram.messenger.HuaweiApplicationLoader" tools:replace="name">
+    <application
+        android:name="org.telegram.ui.HuaweiApplicationLoaderlmpl"
+        tools:replace="name"
+        android:extractNativeLibs="true"
+    >
         <service
             android:name="org.telegram.messenger.GoogleVoiceClientService"
             android:exported="true"

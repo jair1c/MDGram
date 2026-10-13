@@ -50,6 +50,7 @@ import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.collection.LongSparseArray;
+import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.DefaultItemAnimator;
@@ -82,7 +83,6 @@ import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
-import org.telegram.ui.ActionBar.ThemeColors;
 import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Adapters.ContactsAdapter;
 import org.telegram.ui.Adapters.SearchAdapter;
@@ -116,6 +116,7 @@ import java.util.ArrayList;
 
 import me.vkryl.android.animator.BoolAnimator;
 import me.vkryl.android.animator.FactorAnimator;
+import uz.unnarsx.cherrygram.core.CGBiometricPrompt;
 
 public class ContactsActivity extends BaseFragment implements FactorAnimator.Target, NotificationCenter.NotificationCenterDelegate, MainTabsActivity.TabFragmentDelegate, WindowAnimatedInsetsProvider.Listener {
     private final int ADDITIONAL_LIST_HEIGHT_DP = Build.VERSION.SDK_INT >= 31 ? 48 : 0;
@@ -143,7 +144,6 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
 
     private ActionBarMenuItem sortItem;
     private boolean sortByName;
-    private SearchTextWatcher contactsSearchWatcher;
 
     private FragmentFloatingButton floatingButton;
     private boolean floatingButtonVisibleByScroll = true;
@@ -153,7 +153,12 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
     private boolean searching;
     private boolean onlyUsers;
     private boolean needPhonebook;
-    private boolean hasMainTabs;
+    public boolean hasMainTabs;
+    private boolean mdgramSearchOpen;
+
+    private boolean isMdgramMainContacts() {
+        return hasMainTabs && !destroyAfterSelect && !returnAsResult && !createSecretChat;
+    }
     private boolean destroyAfterSelect;
     private boolean returnAsResult;
     private boolean createSecretChat;
@@ -294,9 +299,12 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
         }
 
         backDrawable = new BackDrawable(false);
-        actionBar.setBackButtonDrawable(backDrawable);
-        if (hasMainTabs) {
-            actionBar.setItemsColor(ThemeColors.TELEGRAM_COLOR, false);
+        if (!hasMainTabs || isMdgramMainContacts()) {
+            actionBar.setBackButtonDrawable(backDrawable);
+        }
+        if (isMdgramMainContacts()) {
+            actionBar.setForceLeftTitle(true);
+            actionBar.getTitleTextView().setTypeface(AndroidUtilities.getTypeface("fonts/LinotteFon.ttf"));
         }
 
         searchField = new FragmentSearchField(context, resourceProvider);
@@ -329,7 +337,18 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
                 if (id == -1) {
                     if (actionBar.isActionModeShowed()) {
                         hideActionMode();
-                    } else if (!hasMainTabs) {
+                    } else if (isMdgramMainContacts() && getParentLayout() != null) {
+                        boolean switchedToChats = false;
+                        for (BaseFragment fragment : getParentLayout().getFragmentStack()) {
+                            if (fragment instanceof MainTabsActivity) {
+                                switchedToChats = ((MainTabsActivity) fragment).openChatsTab(true);
+                                break;
+                            }
+                        }
+                        if (!switchedToChats) {
+                            finishFragment();
+                        }
+                    } else {
                         finishFragment();
                     }
                 } else if (id == delete) {
@@ -340,8 +359,23 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
                     listViewAdapter.setSortType(sortByName ? 1 : 2, false);
                     sortItem.setIcon(sortByName ? R.drawable.msg_contacts_time : R.drawable.msg_contacts_name);
                 } else if (id == search_button) {
+                    if (isMdgramMainContacts()) {
+                        mdgramSearchOpen = !mdgramSearchOpen;
+                        searchField.setVisibility(mdgramSearchOpen ? View.VISIBLE : View.GONE);
+                        if (!mdgramSearchOpen) {
+                            searchField.editText.setText("");
+                            searchField.editText.clearFocus();
+                            AndroidUtilities.hideKeyboard(searchField.editText);
+                        }
+                        checkUi_listViewPadding();
+                        checkUi_searchButton();
+                        if (!mdgramSearchOpen) {
+                            return;
+                        }
+                    }
                     listView.smoothScrollToPosition(0);
-                    contactsSearchWatcher.toggleSearch(true);
+//                    animatorSearchFieldVisible.setValue(true, true);
+//                    animatorSearchFieldHeight.animateTo(dp(DialogsActivity.SEARCH_FIELD_HEIGHT));
                     AndroidUtilities.doOnPreDraw(searchField.editText, () -> {
                         searchField.editText.requestFocus();
                         AndroidUtilities.showKeyboard(searchField.editText);
@@ -355,22 +389,10 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
         searchItem = menu.addItem(search_button, R.drawable.outline_header_search);
         searchItem.setContentDescription(getString(R.string.SearchContacts));
 
-        searchField.setVisibility(View.GONE);
-        searchField.setCloseButtonOnClickListener(() -> {
-            AndroidUtilities.hideKeyboard(searchField.editText);
-            searchField.editText.clearFocus();
-            searchField.editText.getText().clear();
-            contactsSearchWatcher.toggleSearch(false);
-        });
-        searchField.editText.addTextChangedListener(contactsSearchWatcher = new SearchTextWatcher(searchField.editText, new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
+        searchField.editText.addTextChangedListener(new SearchTextWatcher(searchField.editText, new ActionBarMenuItem.ActionBarMenuItemSearchListener() {
             @Override
             public void onSearchExpand() {
                 searching = true;
-                searchField.setVisibility(View.VISIBLE);
-                searchField.setCloseButtonVisible(true);
-                animatorSearchFieldVisible.setValue(true, true);
-                checkUi_listViewPadding();
-                checkUi_searchFieldY();
                 checkUi_floatingButtonVisible();
             }
 
@@ -386,12 +408,6 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
                 listView.setVerticalScrollBarEnabled(false);
                 listView.getFastScroll().topOffset = dp(90);
                 // emptyView.setText(LocaleController.getString(R.string.NoContacts));
-                AndroidUtilities.hideKeyboard(searchField.editText);
-                searchField.editText.clearFocus();
-                searchField.setCloseButtonVisible(false);
-                searchField.setVisibility(View.GONE);
-                animatorSearchFieldVisible.setValue(false, true);
-                checkUi_listViewPadding();
                 checkUi_floatingButtonVisible();
             }
 
@@ -437,6 +453,8 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
             }
         };
         searchListViewAdapter.includeSearch = false;
+        searchListViewAdapter.setUseUserCell(true);
+        searchListViewAdapter.setAddMutualIcon(true);
         int inviteViaLink;
         if (chatId != 0) {
             TLRPC.Chat chat = getMessagesController().getChat(chatId);
@@ -473,6 +491,7 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
             }
         };
         listViewAdapter.setSortType(sortItem != null ? (sortByName ? 1 : 2) : 0, false);
+        listViewAdapter.setMdgramMainContacts(isMdgramMainContacts());
         listViewAdapter.setDisableSections(disableSections);
         listViewAdapter.includeSearch = false;
 
@@ -553,8 +572,10 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
         listView.addEdgeEffectListener(() -> listView.postOnAnimation(() -> {
             blur3_InvalidateBlur();
         }));
-        listView.setSections(true);
-        contentView.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
+        if (!isMdgramMainContacts()) {
+            listView.setSections(true);
+        }
+        contentView.setBackgroundColor(getThemedColor(isMdgramMainContacts() ? Theme.key_windowBackgroundWhite : Theme.key_windowBackgroundGray));
 
         FlickerLoadingView flickerLoadingView = new FlickerLoadingView(context);
         flickerLoadingView.setViewType(FlickerLoadingView.PROFILE_SEARCH_CELL);
@@ -584,6 +605,9 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
         contentView.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.LEFT, 0, -ADDITIONAL_LIST_HEIGHT_DP, 0, -ADDITIONAL_LIST_HEIGHT_DP));
 
         contentView.addView(searchField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 52, Gravity.TOP, 6, 0, 6, 0));
+        if (isMdgramMainContacts()) {
+            searchField.setVisibility(View.GONE);
+        }
 
         listView.setEmptyView(emptyView);
         listView.setAnimateEmptyView(true, RecyclerListView.EMPTY_VIEW_ANIMATION_TYPE_ALPHA);
@@ -628,7 +652,16 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
                             Bundle args = new Bundle();
                             args.putLong("user_id", user.id);
                             if (getMessagesController().checkCanOpenChat(args, ContactsActivity.this)) {
-                                presentFragment(new ChatActivity(args), needFinishFragment);
+                                if (getParentActivity() != null
+                                        && getChatsPasswordHelper().isChatLocked(user.id)
+                                        && getChatsPasswordHelper().shouldRequireBiometricsToOpenChats()
+                                ) {
+                                    CGBiometricPrompt.prompt(getParentActivity(), () -> {
+                                        presentFragment(new ChatActivity(args), needFinishFragment);
+                                    });
+                                } else {
+                                    presentFragment(new ChatActivity(args), false);
+                                }
                             }
                         }
                     }
@@ -691,7 +724,30 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
 //                    section--;
 //                }
                 if ((!onlyUsers || inviteViaLink != 0) && section == 0) {
-                    if (needPhonebook) {
+                    if (isMdgramMainContacts()) {
+                        if (MessagesController.getInstance(currentAccount).isFrozen()) {
+                            AccountFrozenAlert.show(currentAccount);
+                            return;
+                        }
+                        if (row == 0) {
+                            presentFragment(new GroupCreateActivity(new Bundle()), false);
+                        } else if (row == 1) {
+                            Bundle args = new Bundle();
+                            args.putBoolean("createSecretChat", true);
+                            args.putBoolean("destroyAfterSelect", true);
+                            presentFragment(new ContactsActivity(args));
+                        } else if (row == 2) {
+                            SharedPreferences preferences = MessagesController.getGlobalMainSettings();
+                            if (!BuildVars.DEBUG_VERSION && preferences.getBoolean("channel_intro", false)) {
+                                Bundle args = new Bundle();
+                                args.putInt("step", 0);
+                                presentFragment(new ChannelCreateActivity(args));
+                            } else {
+                                presentFragment(new ActionIntroActivity(ActionIntroActivity.ACTION_TYPE_CHANNEL_CREATE));
+                                preferences.edit().putBoolean("channel_intro", true).apply();
+                            }
+                        }
+                    } else if (needPhonebook) {
                         if (row == 0) {
                             if (MessagesController.getInstance(currentAccount).isFrozen()) {
                                 AccountFrozenAlert.show(currentAccount);
@@ -729,7 +785,7 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
                                 presentFragment(new ChannelCreateActivity(args));
                             } else {
                                 presentFragment(new ActionIntroActivity(ActionIntroActivity.ACTION_TYPE_CHANNEL_CREATE));
-                                preferences.edit().putBoolean("channel_intro", true).commit();
+                                preferences.edit().putBoolean("channel_intro", true).apply();
                             }
                         }
                     }
@@ -753,7 +809,16 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
                                 Bundle args = new Bundle();
                                 args.putLong("user_id", user.id);
                                 if (getMessagesController().checkCanOpenChat(args, ContactsActivity.this)) {
-                                    presentFragment(new ChatActivity(args), needFinishFragment);
+                                    if (getParentActivity() != null
+                                            && getChatsPasswordHelper().isChatLocked(user.id)
+                                            && getChatsPasswordHelper().shouldRequireBiometricsToOpenChats()
+                                    ) {
+                                        CGBiometricPrompt.prompt(getParentActivity(), () -> {
+                                            presentFragment(new ChatActivity(args), needFinishFragment);
+                                        });
+                                    } else {
+                                        presentFragment(new ChatActivity(args), false);
+                                    }
                                 }
                             }
                         }
@@ -768,7 +833,7 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
                         }
                         AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
                         builder.setMessage(getString(R.string.InviteUser));
-                        builder.setTitle(getString(R.string.AppName));
+                        builder.setTitle(getString(R.string.CG_AppName));
                         final String arg1 = usePhone;
                         builder.setPositiveButton(getString(R.string.OK), (dialogInterface, i) -> {
                             try {
@@ -954,7 +1019,9 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
 
         if (!createSecretChat && !returnAsResult) {
             floatingButton = new FragmentFloatingButton(context, resourceProvider);
-            floatingButton.setUseRoundedShape(true);
+            if (isMdgramMainContacts()) {
+                floatingButton.setRoundedSquare(true);
+            }
             contentView.addView(floatingButton, FragmentFloatingButton.createDefaultLayoutParams());
             floatingButton.setOnClickListener(v -> {
                 if (MessagesController.getInstance(currentAccount).isFrozen()) {
@@ -980,11 +1047,17 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
         headerShadowView.setShadowVisible(false, false);
         contentView.addView(headerShadowView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 5, Gravity.TOP));
 
-        actionBar.setAdaptiveBackground(listView);
+        if (isMdgramMainContacts()) {
+            actionBar.setAdaptiveBackground(listView, false, Theme.key_windowBackgroundWhite, Theme.key_windowBackgroundWhite);
+            actionBar.setTitleColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
+            actionBar.setItemsColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueIcon), false);
+        } else {
+            actionBar.setAdaptiveBackground(listView);
+        }
         actionBar.setDrawBlurBackground(contentView);
 
 //        animatorSearchFieldHeight.forceFactor(dp(DialogsActivity.SEARCH_FIELD_HEIGHT));
-        animatorSearchFieldVisible.setValue(false, false);
+        animatorSearchFieldVisible.setValue(true, false);
 
         checkUi_searchFieldHint();
 
@@ -1159,7 +1232,7 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
                 }
             }
             AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-            builder.setTitle(getString(R.string.AppName));
+            builder.setTitle(getString(R.string.CG_AppName));
             String message = LocaleController.formatStringSimple(selectAlertString, UserObject.getUserName(user));
             EditTextBoldCursor editText = null;
             if (!user.bot && needForwardCount) {
@@ -1241,19 +1314,12 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
 
     @Override
     public boolean onBackPressed(boolean invoked) {
-        if (actionBar.isActionModeShowed()) {
+        if (actionBar != null && actionBar.isActionModeShowed()) {
             if (invoked) hideActionMode();
             return false;
         } else if (animatorSearchHasQuery.getValue()) {
-            if (invoked) {
+            if (invoked && searchField != null) {
                 searchField.editText.getText().clear();
-            }
-            return false;
-        } else if (searching) {
-            if (invoked) {
-                AndroidUtilities.hideKeyboard(searchField.editText);
-                searchField.editText.clearFocus();
-                contactsSearchWatcher.toggleSearch(false);
             }
             return false;
         }
@@ -1315,6 +1381,8 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
         }
         if (alert && askAboutContacts) {
             AlertDialog.Builder builder = AlertsCreator.createContactsPermissionDialog(activity, param -> {
+                MessagesController.getGlobalNotificationsSettings().edit().putBoolean("askAboutContacts2", false).commit();
+                NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.contactsPermissionBadgeCheck);
                 askAboutContacts = param != 0;
                 if (param == 0) {
                     return;
@@ -1348,7 +1416,10 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
                     if (grantResults[a] == PackageManager.PERMISSION_GRANTED) {
                         ContactsController.getInstance(currentAccount).forceImportContacts();
                     } else {
-                        MessagesController.getGlobalNotificationsSettings().edit().putBoolean("askAboutContacts", askAboutContacts = false).commit();
+                        MessagesController.getGlobalNotificationsSettings().edit()
+                                .putBoolean("askAboutContacts", askAboutContacts = false)
+                                .putBoolean("askAboutContacts2", false)
+                                .apply();
                         if (SystemClock.elapsedRealtime() - permissionRequestTime < 200) {
                             try {
                                 Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
@@ -1472,9 +1543,13 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
             }
             if (actionBar != null) {
                 actionBar.updateColors();
+                if (isMdgramMainContacts()) {
+                    actionBar.setTitleColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
+                    actionBar.setItemsColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueIcon), false);
+                }
             }
             if (contentView != null) {
-                contentView.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
+                contentView.setBackgroundColor(getThemedColor(isMdgramMainContacts() ? Theme.key_windowBackgroundWhite : Theme.key_windowBackgroundGray));
             }
         };
 
@@ -1604,7 +1679,8 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
 
     @NonNull
     private WindowInsetsCompat onApplyWindowInsets(@NonNull View v, @NonNull WindowInsetsCompat insets) {
-        navigationBarHeight = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom;
+        final Insets systemInsets = AndroidUtilities.getDefaultWindowInsets(insets, false);
+        navigationBarHeight = systemInsets.bottom;
 
         checkUi_listViewPadding();
         checkUi_floatingButtonPosition();
@@ -1630,7 +1706,7 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
     private void checkUi_listViewPadding() {
         listView.setPadding(
             0,
-            dp(ADDITIONAL_LIST_HEIGHT_DP + (searching ? 44 : 0)) + actionBar.getMeasuredHeight(),
+            dp(ADDITIONAL_LIST_HEIGHT_DP + (isMdgramMainContacts() ? (mdgramSearchOpen ? 52 : 0) : 44)) + actionBar.getMeasuredHeight(),
             0,
             dp(ADDITIONAL_LIST_HEIGHT_DP) + navigationBarHeight + additionNavigationBarHeight
         );
@@ -1649,10 +1725,26 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
     }
 
     private void checkUi_searchFieldY() {
-        if (!searching) {
+        if (isMdgramMainContacts()) {
+            searchField.setTranslationY(actionBar.getMeasuredHeight());
             return;
         }
-        searchField.setTranslationY(actionBar.getMeasuredHeight());
+        float top = listView.getY() + listView.getPaddingTop();
+        for (int i = 0; i < listView.getChildCount(); ++i) {
+            final View child = listView.getChildAt(i);
+            final int position = listView.getChildAdapterPosition(child);
+            if (position == 0) {
+                final RecyclerView.ItemDecoration decoration = listView.getItemDecorationAt(i);
+                decoration.getItemOffsets(AndroidUtilities.rectTmp2, child, listView, listView.mState);
+                top = listView.getY() + (child.getY() - (listViewAdapter.isEmptyWithMainTabs ? 0 : AndroidUtilities.rectTmp2.top));
+                break;
+            } else if (position > 0) {
+                top = -dp(52);
+                break;
+            }
+        }
+        searchField.setTranslationY(lerp(top, listView.getY() + listView.getPaddingTop(), animatorSearchHasQuery.getFloatValue()) - dp(48));
+        animatorSearchFieldVisible.setValue(top > listView.getY() + listView.getPaddingTop() - dp(12), true);
     }
 
     private void checkUi_sortItem() {
@@ -1663,6 +1755,10 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
     }
 
     private void checkUi_searchButton() {
+        if (isMdgramMainContacts()) {
+            FragmentFloatingButton.setAnimatedVisibility(searchItem, 1f);
+            return;
+        }
         final float factor1 = 1f - animatorSearchFieldVisible.getFloatValue();
         final float factor2 = 1f - animatorSearchHasQuery.getFloatValue();
         final float factor = factor1 * factor2;
@@ -1732,5 +1828,14 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
             scrollHelper.setScrollDirection(RecyclerAnimationScrollHelper.SCROLL_DIRECTION_UP);
             scrollHelper.scrollToPosition(0, 0, false, true);
         }
+//        animatorSearchFieldHeight.animateTo(dp(DialogsActivity.SEARCH_FIELD_HEIGHT));
+        animatorSearchFieldVisible.setValue(true, true);
     }
+
+    /** Cherrygram start */
+    public FragmentSearchField getFragmentSearchField() {
+        return searchField;
+    }
+    /** Cherrygram finish */
+
 }

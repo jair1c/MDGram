@@ -67,6 +67,9 @@ import org.telegram.ui.LaunchActivity;
 import java.io.File;
 import java.util.Collections;
 
+import uz.unnarsx.cherrygram.core.configs.CherrygramAppearanceConfig;
+import uz.unnarsx.cherrygram.core.configs.CherrygramCoreConfig;
+
 public class StoriesUtilities {
 
     private final static int ANIMATION_SEGMENT_COUNT = 16;
@@ -189,9 +192,12 @@ public class StoriesUtilities {
             params.inc = false;
         }
         params.showProgress = showProgress;
-        if (params.currentState == STATE_EMPTY && params.progressToSate == 1f) {
+        if (CherrygramCoreConfig.INSTANCE.getHideStories() || params.currentState == STATE_EMPTY && params.progressToSate == 1f) {
             avatarImage.setImageCoords(params.originalAvatarRect);
+            canvas.save();
+            canvas.scale(scale, scale, params.originalAvatarRect.centerX(), params.originalAvatarRect.centerY());
             avatarImage.draw(canvas);
+            canvas.restore();
             return;
         }
         int restoreCount = canvas.save();
@@ -1278,7 +1284,16 @@ public class StoriesUtilities {
         Runnable longPressRunnable;
         public View child;
 
+        public boolean isAvatarClickable(long dialogId, TLRPC.Chat chat, TLRPC.User user) {
+            return false;
+        }
+
+        public boolean onAvatarClick(View view, long dialogId) {
+            return false;
+        }
+
         public boolean checkOnTouchEvent(MotionEvent event, View view) {
+            if (CherrygramCoreConfig.INSTANCE.getHideStories()) return false;
             child = view;
             StoriesController storiesController = MessagesController.getInstance(UserConfig.selectedAccount).getStoriesController();
             if (event.getAction() == MotionEvent.ACTION_DOWN && originalAvatarRect.contains(event.getX(), event.getY())) {
@@ -1290,7 +1305,10 @@ public class StoriesUtilities {
                     chat = MessagesController.getInstance(UserConfig.selectedAccount).getChat(-dialogId);
                 }
                 boolean hasStories;
-                if (drawHiddenStoriesAsSegments) {
+
+                if (isAvatarClickable(dialogId, chat, user)) {
+                    hasStories = true;
+                } else if (drawHiddenStoriesAsSegments) {
                     hasStories = storiesController.hasHiddenStories();
                 } else {
                     if (dialogId > 0) {
@@ -1367,6 +1385,10 @@ public class StoriesUtilities {
         }
 
         private void processOpenStory(View view) {
+            if (onAvatarClick(view, dialogId)) {
+                return;
+            }
+
             int currentAccount = UserConfig.selectedAccount;
             MessagesController messagesController = MessagesController.getInstance(UserConfig.selectedAccount);
             StoriesController storiesController = messagesController.getStoriesController();
@@ -1559,7 +1581,7 @@ public class StoriesUtilities {
         }
 
         public void setColor(MessagesController.PeerColor peerColor, boolean animated) {
-            if (peerColor != null) {
+            if (peerColor != null && CherrygramAppearanceConfig.INSTANCE.getProfileBackgroundColor()) {
                 setColors(
                     peerColor.getStoryColor1(Theme.isCurrentThemeDark()),
                     peerColor.getStoryColor2(Theme.isCurrentThemeDark()),

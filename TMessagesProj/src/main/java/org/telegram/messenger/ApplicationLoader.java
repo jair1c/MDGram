@@ -33,7 +33,7 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 
 import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GooglePlayServicesUtil;
+import com.google.android.gms.common.GoogleApiAvailability;
 
 import org.json.JSONObject;
 import org.telegram.messenger.voip.VideoCapturerDevice;
@@ -43,10 +43,20 @@ import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.Components.ForegroundDetector;
 import org.telegram.ui.Components.ItemOptions;
 import org.telegram.ui.IUpdateLayout;
+import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.LauncherIconController;
 
 import java.io.File;
 import java.util.Locale;
+
+import uz.unnarsx.cherrygram.core.CherrygramLogger;
+import uz.unnarsx.cherrygram.core.configs.CherrygramExperimentalConfig;
+import uz.unnarsx.cherrygram.core.memory.MemoryMonitor;
+import uz.unnarsx.cherrygram.core.configs.CherrygramCoreConfig;
+import uz.unnarsx.cherrygram.core.firebase.FirebaseAnalyticsHelper;
+import uz.unnarsx.cherrygram.core.firebase.crashlytics.FirebaseCrashlyticsHelper;
+import uz.unnarsx.cherrygram.core.ui.CGBulletinCreator;
+import uz.unnarsx.cherrygram.misc.widgets.KaboomWidget;
 
 public class ApplicationLoader extends Application {
 
@@ -72,6 +82,7 @@ public class ApplicationLoader extends Application {
     public static volatile boolean mainInterfacePausedStageQueue = true;
     public static boolean canDrawOverlays;
     public static volatile long mainInterfacePausedStageQueueTime;
+    public static boolean hasPlayServices;
 
     private static PushListenerController.IPushListenerServiceProvider pushProvider;
     private static IMapsProvider mapsProvider;
@@ -171,7 +182,7 @@ public class ApplicationLoader extends Application {
         } catch (Exception e) {
             FileLog.e(e);
         }
-        return new File("/data/data/org.telegram.messenger/files");
+        return new File("/data/data/uz.unnarsx.cherrygram/files");
     }
 
     public static File getFilesDirFixed(String child) {
@@ -211,8 +222,11 @@ public class ApplicationLoader extends Application {
 
                     }
 
-                    boolean isSlow = isConnectionSlow();
+                    boolean isSlow = CherrygramCoreConfig.INSTANCE.getSlowNetworkMode();
                     for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+                        if (a != 0 && !UserConfig.getInstance(a).isClientActivated()) {
+                            continue;
+                        }
                         ConnectionsManager.getInstance(a).checkConnection();
                         FileLoader.getInstance(a).onNetworkChanged(isSlow);
                     }
@@ -244,16 +258,41 @@ public class ApplicationLoader extends Application {
         }
 
         SharedConfig.loadConfig();
+        hasPlayServices = checkPlayServices();
+        /*if (!CherrygramCoreConfig.isPlayStoreBuild()) {
+            Continuation<Object> suspendResult = new Continuation<>() {
+                @NonNull
+                @Override
+                public CoroutineContext getContext() {
+                    return EmptyCoroutineContext.INSTANCE;
+                }
+
+                @Override
+                public void resumeWith(@NonNull Object o) {
+
+                }
+            };
+            KotlinFragmentsManager.INSTANCE.checkConnection(suspendResult);
+        }*/
         SharedPrefsHelper.init(applicationContext);
-        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
-            UserConfig.getInstance(a).loadConfig();
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            UserConfig userConfig = UserConfig.getInstance(a);
+            userConfig.loadConfig();
+            // MDGram supports more accounts than upstream Telegram. Initializing every
+            // empty slot at startup creates a database, network stack and worker threads
+            // for each one, which is wasteful and can exhaust native translation layers
+            // used by Android emulators. Account 0 is needed for the login flow; other
+            // accounts can stay lazy until they have actually been activated.
+            if (a != 0 && !userConfig.isClientActivated()) {
+                continue;
+            }
             MessagesController.getInstance(a);
             if (a == 0) {
                 SharedConfig.pushStringStatus = "__FIREBASE_GENERATING_SINCE_" + ConnectionsManager.getInstance(a).getCurrentTime() + "__";
             } else {
                 ConnectionsManager.getInstance(a);
             }
-            TLRPC.User user = UserConfig.getInstance(a).getCurrentUser();
+            TLRPC.User user = userConfig.getCurrentUser();
             if (user != null) {
                 MessagesController.getInstance(a).putUser(user, true);
                 SendMessagesHelper.getInstance(a).checkUnsentMessages();
@@ -267,7 +306,10 @@ public class ApplicationLoader extends Application {
         }
 
         MediaController.getInstance();
-        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) { //TODO improve account
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            if (a != 0 && !UserConfig.getInstance(a).isClientActivated()) {
+                continue;
+            }
             ContactsController.getInstance(a).checkAppAccount();
             DownloadController.getInstance(a);
         }
@@ -289,7 +331,11 @@ public class ApplicationLoader extends Application {
 
         super.onCreate();
 
+        // AndroidUtilities must be initialized before FileLog
+        final String helloWorld = AndroidUtilities.getHelloWorld();
+
         if (BuildVars.LOGS_ENABLED) {
+            FileLog.d(helloWorld);
             FileLog.d("app start time = " + (startTime = SystemClock.elapsedRealtime()));
             try {
                 final PackageInfo info = ApplicationLoader.applicationContext.getPackageManager().getPackageInfo(ApplicationLoader.applicationContext.getPackageName(), 0);
@@ -318,11 +364,15 @@ public class ApplicationLoader extends Application {
             applicationContext = getApplicationContext();
         }
 
+        MDGramConfig.applyVisualDefaultsOnce();
+
         NativeLoader.initNativeLibs(ApplicationLoader.applicationContext);
+
         try {
             ConnectionsManager.native_setJava(false);
         } catch (UnsatisfiedLinkError error) {
-            throw new RuntimeException("can't load native libraries " +  Build.CPU_ABI + " lookup folder " + NativeLoader.getAbiFolder());
+            FirebaseCrashlyticsHelper.INSTANCE.logAsNonFatal(error);
+//            throw new RuntimeException("can't load native libraries " +  Build.CPU_ABI + " lookup folder " + NativeLoader.getAbiFolder());
         }
         new ForegroundDetector(this) {
             @Override
@@ -334,6 +384,10 @@ public class ApplicationLoader extends Application {
                 }
             }
         };
+        if (BuildConfig.DEBUG_VERSION) {
+            new ANRDetector(FileLog::dumpANR);
+        }
+
         if (BuildVars.LOGS_ENABLED) {
             FileLog.d("load libs time = " + (SystemClock.elapsedRealtime() - startTime));
         }
@@ -341,28 +395,42 @@ public class ApplicationLoader extends Application {
         applicationHandler = new Handler(applicationContext.getMainLooper());
 
         AndroidUtilities.runOnUIThread(ApplicationLoader::startPushService);
-        AndroidUtilities.runOnUIThread(MDGramResidentService::update); // MDGram: notificación persistente (Otros Mods)
+
+        initCG();
 
         LauncherIconController.tryFixLauncherIconIfNeeded();
         ProxyRotationController.init();
     }
 
     public static void startPushService() {
+        if (applicationContext == null) {
+            return;
+        }
+
         SharedPreferences preferences = MessagesController.getGlobalNotificationsSettings();
+        if (preferences == null) {
+            return;
+        }
+
         boolean enabled;
         if (preferences.contains("pushService")) {
             enabled = preferences.getBoolean("pushService", true);
         } else {
             enabled = MessagesController.getMainSettings(UserConfig.selectedAccount).getBoolean("keepAliveService", false);
         }
-        if (enabled) {
-            try {
-                applicationContext.startService(new Intent(applicationContext, NotificationsService.class));
-            } catch (Throwable ignore) {
 
+        try {
+            if (enabled) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM && CherrygramCoreConfig.INSTANCE.getResidentNotification()) {
+                    applicationContext.startForegroundService(new Intent(applicationContext, NotificationsService.class));
+                } else {
+                    applicationContext.startService(new Intent(applicationContext, NotificationsService.class));
+                }
+            } else {
+                applicationContext.stopService(new Intent(applicationContext, NotificationsService.class));
             }
-        } else {
-            applicationContext.stopService(new Intent(applicationContext, NotificationsService.class));
+        } catch (Throwable e) {
+            CherrygramLogger.e(e);
         }
     }
 
@@ -393,9 +461,9 @@ public class ApplicationLoader extends Application {
         }, 1000);
     }
 
-    private boolean checkPlayServices() {
+    public static boolean checkPlayServices() {
         try {
-            int resultCode = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
+            int resultCode = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(ApplicationLoader.applicationContext);
             return resultCode == ConnectionResult.SUCCESS;
         } catch (Exception e) {
             FileLog.e(e);
@@ -704,4 +772,39 @@ public class ApplicationLoader extends Application {
     public File getDownloadedUpdateFile() {
         return null;
     }
+
+    public boolean showUpdaterBottomSheet(BaseFragment fragment, boolean available, TLRPC.TL_help_appUpdate update) {
+        return false;
+    }
+
+    /** Cherrygram start */
+    private void initCG() {
+        KaboomWidget.forceUpdateKaboomWidgets(applicationContext);
+        FirebaseAnalyticsHelper.INSTANCE.init(applicationContext);
+
+        if (CherrygramExperimentalConfig.INSTANCE.getUse_CG_OOMHandler()) {
+            MemoryMonitor memoryMonitor = new MemoryMonitor(
+                    this,
+                    MemoryMonitor.getCleanupThresholdRatio(),
+                    CherrygramExperimentalConfig.INSTANCE.getOomHandlerPopupThreshold() / 100,
+                    5000L,
+                    15000L,
+                    ratio -> {
+                        ImageLoader.getInstance().clearMemory();
+
+                        AndroidUtilities.runOnUIThread(() -> {
+                            if (LaunchActivity.instance != null) {
+                                LaunchActivity.instance.onLowMemory();
+                            }
+                        });
+                        System.gc();
+                    },
+                    CGBulletinCreator.INSTANCE::createAppRestartDialog
+            );
+
+            memoryMonitor.start();
+        }
+    }
+    /** Cherrygram finish */
+
 }

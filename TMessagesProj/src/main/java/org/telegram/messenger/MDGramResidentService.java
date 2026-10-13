@@ -53,7 +53,7 @@ public class MDGramResidentService extends Service {
             }
             PendingIntent contentIntent = PendingIntent.getActivity(ApplicationLoader.applicationContext, 0, open, piFlags);
             NotificationCompat.Builder builder = new NotificationCompat.Builder(ApplicationLoader.applicationContext)
-                    .setSmallIcon(R.drawable.notification)
+                    .setSmallIcon(R.drawable.mdgram_notification)
                     .setChannelId(NotificationsController.OTHER_NOTIFICATIONS_CHANNEL)
                     .setContentTitle("MDGram")
                     .setContentText("MDGram se está ejecutando")

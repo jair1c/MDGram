@@ -191,12 +191,13 @@ public final class Util {
    */
   public static byte[] toByteArray(InputStream inputStream) throws IOException {
     byte[] buffer = new byte[1024 * 4];
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    int bytesRead;
-    while ((bytesRead = inputStream.read(buffer)) != -1) {
-      outputStream.write(buffer, 0, bytesRead);
+    try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+        int bytesRead;
+        while ((bytesRead = inputStream.read(buffer)) != -1) {
+            outputStream.write(buffer, 0, bytesRead);
+        }
+        return outputStream.toByteArray();
     }
-    return outputStream.toByteArray();
   }
 
   /**

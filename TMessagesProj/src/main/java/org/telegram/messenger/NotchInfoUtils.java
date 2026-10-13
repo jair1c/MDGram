@@ -65,6 +65,12 @@ public class NotchInfoUtils {
 
             Path p;
             try {
+                spec = spec.replaceAll("\\p{C}", "").trim(); // Fix for some devices
+
+                if (spec.startsWith("V") || spec.startsWith("H")) {
+                    spec = "M 0,0 " + spec;
+                }
+
                 PathParser.PathDataNode[] n = PathParser.createNodesFromPathData(spec);
 
                 p = new Path();

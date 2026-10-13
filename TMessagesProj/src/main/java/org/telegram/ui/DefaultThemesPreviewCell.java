@@ -40,6 +40,8 @@ import org.telegram.ui.Components.ThemeSmallPreviewView;
 
 import java.util.ArrayList;
 
+import uz.unnarsx.cherrygram.core.ui.MD3ListAdapter;
+
 @SuppressLint("ViewConstructor")
 public class DefaultThemesPreviewCell extends LinearLayout {
 
@@ -133,7 +135,7 @@ public class DefaultThemesPreviewCell extends LinearLayout {
             if (info != null) {
                 SharedPreferences.Editor editor = ApplicationLoader.applicationContext.getSharedPreferences("themeconfig", Activity.MODE_PRIVATE).edit();
                 editor.putString(currentType == ThemeActivity.THEME_TYPE_NIGHT || info.isDark() ? "lastDarkTheme" : "lastDayTheme", info.getKey());
-                editor.commit();
+                editor.apply();
             }
 
             Theme.turnOffAutoNight(parentFragment);
@@ -352,6 +354,9 @@ public class DefaultThemesPreviewCell extends LinearLayout {
     public void updateDayNightMode() {
         if (currentType == ThemeActivity.THEME_TYPE_BASIC || currentType == TYPE_CUSTOM_LIST) {
             themeIndex = !Theme.isCurrentThemeDay() ? 2 : 0;
+        } else if (currentType == ThemeActivity.THEME_TYPE_THEMES_BROWSER) {
+            // V21 browses patterned Blue variants independently of the current light theme.
+            themeIndex = Theme.isCurrentThemeDay() ? 0 : 3;
         } else {
             if (Theme.getActiveTheme().getKey().equals("Blue")) {
                 themeIndex = 0;
@@ -432,7 +437,7 @@ public class DefaultThemesPreviewCell extends LinearLayout {
         if (currentType != ThemeActivity.THEME_TYPE_OTHER) {
             SharedPreferences.Editor editor = ApplicationLoader.applicationContext.getSharedPreferences("themeconfig", Activity.MODE_PRIVATE).edit();
             editor.putString(currentType == ThemeActivity.THEME_TYPE_NIGHT || themeInfo.isDark() ? "lastDarkTheme" : "lastDayTheme", themeInfo.getKey());
-            editor.commit();
+            editor.apply();
         }
         if (currentType == ThemeActivity.THEME_TYPE_NIGHT) {
             if (themeInfo == Theme.getCurrentNightTheme()) {
@@ -457,7 +462,7 @@ public class DefaultThemesPreviewCell extends LinearLayout {
                 dayNightCell.setColors(-1, Theme.key_windowBackgroundWhiteBlueText4);
             }
             if (browseThemesCell != null) {
-                browseThemesCell.setBackground(Theme.createSelectorWithBackgroundDrawable(Theme.getColor(Theme.key_windowBackgroundWhite), Theme.getColor(Theme.key_listSelector)));
+                browseThemesCell.setBackground(Theme.createSelectorWithBackgroundDrawable(MD3ListAdapter.getBackgroundColor(), Theme.getColor(Theme.key_listSelector)));
                 browseThemesCell.setColors(Theme.key_windowBackgroundWhiteBlueText4, Theme.key_windowBackgroundWhiteBlueText4);
             }
         }

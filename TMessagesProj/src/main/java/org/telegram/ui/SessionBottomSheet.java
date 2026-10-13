@@ -366,9 +366,16 @@ public class SessionBottomSheet extends BottomSheet {
             colorKey = Theme.key_avatar_backgroundCyan;
             colorKey2 = Theme.key_avatar_background2Cyan;
         } else if (platform.contains("android")) {
-            iconId = R.raw.android_30;
-            colorKey = Theme.key_avatar_backgroundGreen;
-            colorKey2 = Theme.key_avatar_background2Green;
+            if (session.app_name.contains("Cherrygram")) {
+                animation = false;
+                iconId = R.drawable.cg_logo_notch;
+                colorKey = 0x00000000;
+                colorKey2 = 0x00000000;
+            } else {
+                iconId = R.raw.android_30;
+                colorKey = Theme.key_avatar_backgroundGreen;
+                colorKey2 = Theme.key_avatar_background2Green;
+            }
         } else {
             if (session.app_name.toLowerCase().contains("desktop")) {
                 iconId = R.raw.windows_30;
@@ -381,13 +388,26 @@ public class SessionBottomSheet extends BottomSheet {
             }
         }
 
-        imageView.setBackground(Theme.createCircleDrawable(dp(42), Theme.getColor(colorKey)));
-//        imageView.setBackground(new SessionCell.CircleGradientDrawable(AndroidUtilities.dp(42), Theme.getColor(colorKey), Theme.getColor(colorKey2)));
+        if (!(session.app_name.contains("Cherrygram"))) {
+            imageView.setBackground(Theme.createCircleDrawable(dp(42), Theme.getColor(colorKey)));
+//            imageView.setBackground(new SessionCell.CircleGradientDrawable(AndroidUtilities.dp(42), Theme.getColor(colorKey), Theme.getColor(colorKey2)));
+        }
         if (animation) {
             int[] colors = new int[]{0x000000, Theme.getColor(colorKey)};
             imageView.setAnimation(iconId, 50, 50, colors);
         } else {
-            imageView.setImageDrawable(ContextCompat.getDrawable(getContext(), iconId));
+            if (session.app_name.contains("Cherrygram")) {
+                Drawable iconDrawable = ContextCompat.getDrawable(getContext(), !Theme.isCurrentThemeDay() ? R.drawable.cg_logo_notch_white : R.drawable.cg_logo_notch);
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(70), dp(70));
+                params.topMargin = dp(15);
+                params.gravity = Gravity.CENTER;
+
+                imageView.setImageDrawable(iconDrawable);
+                imageView.setScaleType(ImageView.ScaleType.FIT_XY);
+                imageView.setLayoutParams(params);
+            } else {
+                imageView.setImageDrawable(ContextCompat.getDrawable(getContext(), iconId));
+            }
         }
     }
 
@@ -425,7 +445,7 @@ public class SessionBottomSheet extends BottomSheet {
             if (needSwitch) {
                 switchView = new Switch(context);
                 switchView.setDrawIconType(1);
-                addView(switchView, LayoutHelper.createFrame(37, 40, Gravity.RIGHT | Gravity.CENTER_VERTICAL, 21, 0, 21, 0));
+                addView(switchView, LayoutHelper.createFrame(39, 40, Gravity.RIGHT | Gravity.CENTER_VERTICAL, 21, 0, 21, 0));
             }
         }
 

@@ -25,6 +25,7 @@ import androidx.recyclerview.widget.ListUpdateCallback;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
@@ -51,6 +52,8 @@ import java.util.GregorianCalendar;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import uz.unnarsx.cherrygram.core.configs.CherrygramAppearanceConfig;
 
 public class FiltersView extends RecyclerListView {
 
@@ -590,7 +593,7 @@ public class FiltersView extends RecyclerListView {
         return false;
     }
 
-    public boolean drawDivider = true;
+    public boolean drawDivider = !CherrygramAppearanceConfig.INSTANCE.getDisableDividers();
 
     @Override
     public void onDraw(Canvas c) {
@@ -758,7 +761,7 @@ public class FiltersView extends RecyclerListView {
                     }
                 } else if (data.chat instanceof TLRPC.Chat) {
                     TLRPC.Chat chat = (TLRPC.Chat) data.chat;
-                    avatarImageView.getImageReceiver().setRoundRadius(AndroidUtilities.dp(16));
+                    avatarImageView.getImageReceiver().setRoundRadius(AndroidUtilities.dp(ChatObject.isCommunity(chat) ? 10 : 16));
                     avatarImageView.getImageReceiver().setForUserOrChat(chat, thumbDrawable);
                 }
             } else {

@@ -26,6 +26,7 @@ import android.os.Build;
 import android.text.Layout;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.StaticLayout;
 import android.text.TextUtils;
 import android.text.style.ClickableSpan;
@@ -65,6 +66,8 @@ import org.telegram.ui.Components.URLSpanNoUnderline;
 
 import java.util.concurrent.atomic.AtomicReference;
 
+import uz.unnarsx.cherrygram.core.ui.MD3ListAdapter;
+
 public class AboutLinkCell extends FrameLayout {
 
     private StaticLayout textLayout;
@@ -72,6 +75,7 @@ public class AboutLinkCell extends FrameLayout {
     private int textX;
     private int textY;
     private SpannableStringBuilder stringBuilder;
+    private CharSequence accessibilityText;
     private TextView valueTextView;
     private TextView showMoreTextView;
     private FrameLayout showMoreTextBackgroundView;
@@ -133,7 +137,7 @@ public class AboutLinkCell extends FrameLayout {
         Drawable shadowDrawable = context.getResources().getDrawable(R.drawable.gradient_bottom).mutate();
         shadowDrawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider), PorterDuff.Mode.SRC_ATOP));
         bottomShadow.setBackground(shadowDrawable);
-        addView(bottomShadow, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 12, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL, 16, 0, 16, 0));
+        addView(bottomShadow, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, MD3ListAdapter.shouldUseCustomColors() ? 0 : 12, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL, 16, 0, 16, 0));
 
         addView(container, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP | Gravity.FILL_HORIZONTAL));
 
@@ -174,7 +178,7 @@ public class AboutLinkCell extends FrameLayout {
         showMoreTextView.setPadding(dp(2), 0, dp(2), 0);
         showMoreTextBackgroundView = new FrameLayout(context);
         showMoreBackgroundDrawable = context.getResources().getDrawable(R.drawable.gradient_left).mutate();
-        showMoreBackgroundDrawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhite, resourcesProvider), PorterDuff.Mode.MULTIPLY));
+        showMoreBackgroundDrawable.setColorFilter(new PorterDuffColorFilter(MD3ListAdapter.getBackgroundColor(resourcesProvider), PorterDuff.Mode.MULTIPLY));
         showMoreTextBackgroundView.setBackground(showMoreBackgroundDrawable);
         showMoreTextBackgroundView.setPadding(
             showMoreTextBackgroundView.getPaddingLeft() + dp(4),
@@ -365,6 +369,7 @@ public class AboutLinkCell extends FrameLayout {
             oldText = text;
         }
         stringBuilder = new SpannableStringBuilder(oldText);
+        accessibilityText = null;
         MessageObject.addLinks(false, stringBuilder, false, false, !parseLinks);
         Emoji.replaceEmoji(stringBuilder, Theme.profile_aboutTextPaint.getFontMetricsInt(), false);
         if (lastMaxWidth <= 0) {
@@ -789,15 +794,39 @@ public class AboutLinkCell extends FrameLayout {
     public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
         super.onInitializeAccessibilityNodeInfo(info);
         if (textLayout != null) {
-            final CharSequence text = stringBuilder;
+            final CharSequence text = buildAccessibilityText();
             final CharSequence valueText = valueTextView.getText();
             info.setClassName("android.widget.TextView");
             if (TextUtils.isEmpty(valueText)) {
                 info.setText(text);
             } else {
-                info.setText(valueText + ": " + text);
+                info.setText(TextUtils.concat(valueText, ": ", text));
             }
         }
+    }
+
+    private CharSequence buildAccessibilityText() {
+        if (accessibilityText != null) return accessibilityText;
+        if (stringBuilder == null) return null;
+        ClickableSpan[] spans = stringBuilder.getSpans(0, stringBuilder.length(), ClickableSpan.class);
+        if (spans == null || spans.length == 0) {
+            return accessibilityText = stringBuilder;
+        }
+        SpannableStringBuilder sb = new SpannableStringBuilder(stringBuilder);
+        for (ClickableSpan span : spans) {
+            int start = sb.getSpanStart(span);
+            int end = sb.getSpanEnd(span);
+            if (start < 0 || end <= start) continue;
+            sb.removeSpan(span);
+            final ClickableSpan original = span;
+            sb.setSpan(new ClickableSpan() {
+                @Override
+                public void onClick(View widget) {
+                    onLinkClick(original, textLayout, 0);
+                }
+            }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return accessibilityText = sb;
     }
 
     public void setMoreButtonDisabled(boolean moreButtonDisabled) {

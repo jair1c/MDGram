@@ -36,7 +36,6 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.text.MeasuredText;
 import android.os.Build;
-import android.util.Log;
 import android.view.View;
 import android.widget.FrameLayout;
 
@@ -45,7 +44,6 @@ import androidx.annotation.NonNull;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DispatchQueue;
 import org.telegram.messenger.FileLog;
-import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.ActionBar;
@@ -56,7 +54,8 @@ import org.telegram.ui.BlurSettingsBottomSheet;
 import org.telegram.ui.ChatBackgroundDrawable;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+
+import uz.unnarsx.cherrygram.core.configs.CherrygramChatsConfig;
 
 public class SizeNotifierFrameLayout extends FrameLayout implements Theme.Colorable {
 
@@ -226,7 +225,7 @@ public class SizeNotifierFrameLayout extends FrameLayout implements Theme.Colora
                 if (drawable instanceof MotionBackgroundDrawable) {
                     MotionBackgroundDrawable motionBackgroundDrawable = (MotionBackgroundDrawable) drawable;
                     if (motionBackgroundDrawable.hasPattern()) {
-                        int actionBarHeight = (isActionBarVisible() ? ActionBar.getCurrentActionBarHeight() : 0) + (isStatusBarVisible() && Build.VERSION.SDK_INT >= 21 && occupyStatusBar ? AndroidUtilities.statusBarHeight : 0);
+                        int actionBarHeight = (isActionBarVisible() ? ActionBar.getCurrentActionBarHeight() : 0) + (isStatusBarVisible() && occupyStatusBar ? AndroidUtilities.statusBarHeight : 0);
                         int viewHeight = useRootView() ? getRootView().getMeasuredHeight() - actionBarHeight : getHeight();
                         float scaleX = (float) getMeasuredWidth() / (float) drawable.getIntrinsicWidth();
                         float scaleY = (float) (viewHeight) / (float) drawable.getIntrinsicHeight();
@@ -248,11 +247,6 @@ public class SizeNotifierFrameLayout extends FrameLayout implements Theme.Colora
                         }
                         motionBackgroundDrawable.setTranslationY(backgroundTranslationY);
                         int bottom = (int) (getRootView().getMeasuredHeight() - backgroundTranslationY + translationY);
-                        if (animationInProgress) {
-                            bottom -= emojiOffset;
-                        } else if (emojiHeight != 0) {
-                            bottom -= emojiHeight;
-                        }
                         drawable.setBounds(0, 0, getMeasuredWidth(), bottom);
                         drawable.draw(canvas);
                         if (bottomClip != 0) {
@@ -292,7 +286,7 @@ public class SizeNotifierFrameLayout extends FrameLayout implements Theme.Colora
                         checkSnowflake(canvas);
                         canvas.restore();
                     } else {
-                        int actionBarHeight = (isActionBarVisible() ? ActionBar.getCurrentActionBarHeight() : 0) + (isStatusBarVisible() && Build.VERSION.SDK_INT >= 21 && occupyStatusBar ? AndroidUtilities.statusBarHeight : 0);
+                        int actionBarHeight = (isActionBarVisible() ? ActionBar.getCurrentActionBarHeight() : 0) + (isStatusBarVisible() && occupyStatusBar ? AndroidUtilities.statusBarHeight : 0);
                         int viewHeight = useRootView() ? getRootView().getMeasuredHeight() - actionBarHeight : getHeight();
                         float scaleX = (float) getMeasuredWidth() / (float) drawable.getIntrinsicWidth();
                         float scaleY = (float) (viewHeight) / (float) drawable.getIntrinsicHeight();
@@ -524,11 +518,6 @@ public class SizeNotifierFrameLayout extends FrameLayout implements Theme.Colora
 
     public int getBackgroundTranslationY() {
         if (backgroundDrawable instanceof MotionBackgroundDrawable) {
-            if (animationInProgress) {
-                return (int) emojiOffset;
-            } else if (emojiHeight != 0) {
-                return emojiHeight;
-            }
             return backgroundTranslationY;
         } else if (backgroundDrawable instanceof ChatBackgroundDrawable) {
             return backgroundTranslationY;
@@ -538,20 +527,7 @@ public class SizeNotifierFrameLayout extends FrameLayout implements Theme.Colora
 
     public int getBackgroundSizeY() {
         int offset = 0;
-        if (backgroundDrawable instanceof MotionBackgroundDrawable) {
-            MotionBackgroundDrawable motionBackgroundDrawable = (MotionBackgroundDrawable) backgroundDrawable;
-            if (!motionBackgroundDrawable.hasPattern()) {
-                if (animationInProgress) {
-                    offset = (int) emojiOffset;
-                } else if (emojiHeight != 0) {
-                    offset = emojiHeight;
-                } else {
-                    offset = backgroundTranslationY;
-                }
-            } else {
-                offset = backgroundTranslationY != 0 ? 0 : -keyboardHeight;
-            }
-        } else if (backgroundDrawable instanceof ChatBackgroundDrawable) {
+        if (backgroundDrawable instanceof ChatBackgroundDrawable) {
             offset = backgroundTranslationY;
         }
         return getMeasuredHeight() - offset;
@@ -581,7 +557,7 @@ public class SizeNotifierFrameLayout extends FrameLayout implements Theme.Colora
     }
 
     private void checkSnowflake(Canvas canvas) {
-        if (backgroundView != null && Theme.canStartHolidayAnimation() && LiteMode.isEnabled(LiteMode.FLAG_CHAT_BACKGROUND)) {
+        if (backgroundView != null && CherrygramChatsConfig.INSTANCE.getDrawSnowInChat() /*Theme.canStartHolidayAnimation() && LiteMode.isEnabled(LiteMode.FLAG_CHAT_BACKGROUND)*/) {
             if (snowflakesEffect == null) {
                 snowflakesEffect = new SnowflakesEffect(1);
                 snowflakesEffect.setForcedColor(0xFFFFFFFF);

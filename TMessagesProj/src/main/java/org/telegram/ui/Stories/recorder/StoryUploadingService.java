@@ -17,6 +17,8 @@ import org.telegram.messenger.NotificationsController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
 
+import uz.unnarsx.cherrygram.core.firebase.crashlytics.FirebaseCrashlyticsHelper;
+
 public class StoryUploadingService extends Service implements NotificationCenter.NotificationCenterDelegate {
 
     private NotificationCompat.Builder builder;
@@ -34,7 +36,9 @@ public class StoryUploadingService extends Service implements NotificationCenter
         super.onDestroy();
         try {
             stopForeground(true);
-        } catch (Exception ignore) {}
+        } catch (Exception e) {
+            FirebaseCrashlyticsHelper.INSTANCE.logAsNonFatal(e);
+        }
         NotificationManagerCompat.from(ApplicationLoader.applicationContext).cancel(33);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.uploadStoryEnd);
         NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.uploadStoryProgress);
@@ -58,6 +62,7 @@ public class StoryUploadingService extends Service implements NotificationCenter
                 try {
                     NotificationManagerCompat.from(ApplicationLoader.applicationContext).notify(33, builder.build());
                 } catch (Throwable e) {
+                    FirebaseCrashlyticsHelper.INSTANCE.logAsNonFatal(e);
                     FileLog.e(e);
                 }
             }
@@ -108,6 +113,7 @@ public class StoryUploadingService extends Service implements NotificationCenter
         try {
             NotificationManagerCompat.from(ApplicationLoader.applicationContext).notify(33, builder.build());
         } catch (Throwable e) {
+            FirebaseCrashlyticsHelper.INSTANCE.logAsNonFatal(e);
             FileLog.e(e);
         }
         return Service.START_NOT_STICKY;

@@ -1,0 +1,191 @@
+/**
+ * This is the source code of Cherrygram for Android.
+ * It is licensed under GNU GPL v. 2 or later.
+ * You should have received a copy of the license in this archive (see LICENSE).
+ * Please, be respectful and credit the original author if you use this code.
+ *
+ * Copyright github.com/arsLan4k1390, 2022-2026.
+ */
+
+package uz.unnarsx.cherrygram.preferences.folders;
+
+import static org.telegram.messenger.LocaleController.getString;
+
+import static uz.unnarsx.cherrygram.preferences.helpers.SettingsHelper.applyProSpan;
+
+import android.content.Context;
+import android.view.View;
+
+import androidx.recyclerview.widget.RecyclerView;
+
+import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.BotWebViewVibrationEffect;
+import org.telegram.messenger.NotificationCenter;
+import org.telegram.messenger.R;
+import org.telegram.ui.Components.IconBackgroundColors;
+import org.telegram.ui.Components.UItem;
+import org.telegram.ui.Components.UniversalAdapter;
+import org.telegram.ui.Components.UniversalFragment;
+import org.telegram.ui.FiltersSetupActivity;
+import org.telegram.ui.SettingsActivity;
+
+import java.util.ArrayList;
+
+import uz.unnarsx.cherrygram.core.configs.CherrygramAppearanceConfig;
+import uz.unnarsx.cherrygram.core.firebase.FirebaseAnalyticsHelper;
+import uz.unnarsx.cherrygram.donates.DonatesManager;
+import uz.unnarsx.cherrygram.helpers.ui.PopupHelper;
+import uz.unnarsx.cherrygram.preferences.BaseCGPreferencesEntry;
+import uz.unnarsx.cherrygram.preferences.folders.cells.FoldersPreviewCell;
+import uz.unnarsx.cherrygram.preferences.helpers.SettingsHelper;
+
+public class FoldersPreferencesEntry extends BaseCGPreferencesEntry {
+
+    protected FoldersPreviewCell foldersPreviewCell;
+
+    private final int hideAllChatsTabRow = 1;
+
+    private final int hideCounterRow = 2;
+    private final int tabIconTypeRow = 3;
+    private final int addStrokeRow = 4;
+
+    private final int folderNameAppHeaderRow = 5;
+    private final int foldersAtBottomRow = 6;
+
+    private final int telegramFoldersSettings = 7;
+
+    @Override
+    protected CharSequence getTitle() {
+        FirebaseAnalyticsHelper.INSTANCE.trackEventWithEmptyBundle("folders_preferences_screen");
+        return getString(R.string.CP_Filters_Header);
+    }
+
+    @Override
+    protected void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
+        foldersPreviewCell = new FoldersPreviewCell(getContext());
+        foldersPreviewCell.setLayoutParams(new RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT));
+        items.add(SettingsHelper.asCustomWithBackground(foldersPreviewCell));
+        items.add(UItem.asShadow(null));
+
+        items.add(SettingsHelper.asSwitchCG(hideAllChatsTabRow, getString(R.string.CP_NewTabs_RemoveAllChats))
+                .setChecked(CherrygramAppearanceConfig.INSTANCE.getTabsHideAllChats())
+        );
+        items.add(SettingsHelper.asSwitchCG(hideCounterRow, getString(R.string.CP_NewTabs_NoCounter))
+                .setChecked(org.telegram.messenger.MDGramConfig.hideFolderCounters())
+        );
+        items.add(UItem.asButton(tabIconTypeRow, getString(R.string.AP_Tab_Style), getTabModeValue()));
+        items.add(SettingsHelper.asSwitchCG(addStrokeRow, getString(R.string.AP_Tab_Style_Stroke))
+                .setChecked(CherrygramAppearanceConfig.INSTANCE.getTabStyleStroke())
+        );
+        items.add(UItem.asShadow(null));
+
+        items.add(SettingsHelper.asSwitchCG(folderNameAppHeaderRow, getString(R.string.AP_FolderNameInHeader), getString(R.string.AP_FolderNameInHeader_Desc))
+                .setChecked(CherrygramAppearanceConfig.INSTANCE.getFolderNameInHeader())
+        );
+        items.add(SettingsHelper.asSwitchCG(foldersAtBottomRow, applyProSpan(getString(R.string.AP_FoldersAtBottom), getResourceProvider()))
+                .setChecked(CherrygramAppearanceConfig.INSTANCE.getFoldersAtBottom()).setLocked(!DonatesManager.INSTANCE.didUserDonateForFeature())
+        );
+        items.add(UItem.asShadow(null));
+
+        items.add(UItem.asHeader(getString(R.string.AppName)));
+        items.add(
+                SettingsActivity.SettingCell.Factory.of(
+                        telegramFoldersSettings,
+                        IconBackgroundColors.BLUE_ALT.top, IconBackgroundColors.BLUE_ALT.bottom,
+                        R.drawable.settings_folders,
+                        getString(R.string.SettingsFolders),
+                        getString(R.string.SettingsFoldersInfo)
+                )
+        );
+        items.add(UItem.asShadow(null));
+    }
+
+    @Override
+    protected void onClick(UItem item, View view, int position, float x, float y) {
+        if (item.id == hideAllChatsTabRow) {
+            CherrygramAppearanceConfig.INSTANCE.setTabsHideAllChats(!CherrygramAppearanceConfig.INSTANCE.getTabsHideAllChats());
+            SettingsHelper.updateCheckState(view, CherrygramAppearanceConfig.INSTANCE.getTabsHideAllChats());
+
+            foldersPreviewCell.updateAllChatsTabName(true);
+
+            if (parentLayout != null) parentLayout.rebuildAllFragmentViews(false, false);
+
+            getNotificationCenter().postNotificationName(NotificationCenter.dialogFiltersUpdated);
+            getNotificationCenter().postNotificationName(NotificationCenter.mainUserInfoChanged);
+        } else if (item.id == hideCounterRow) {
+            org.telegram.messenger.MDGramConfig.setHideFolderCounters(!org.telegram.messenger.MDGramConfig.hideFolderCounters());
+            SettingsHelper.updateCheckState(view, org.telegram.messenger.MDGramConfig.hideFolderCounters());
+
+            foldersPreviewCell.updateTabCounter(true);
+
+            if (parentLayout != null) parentLayout.rebuildAllFragmentViews(false, false);
+
+            getNotificationCenter().postNotificationName(NotificationCenter.dialogFiltersUpdated);
+        } else if (item.id == tabIconTypeRow) {
+            ArrayList<String> configStringKeys = new ArrayList<>();
+            ArrayList<Integer> configValues = new ArrayList<>();
+
+            configStringKeys.add(getString(R.string.CG_FoldersTypeIconsTitles));
+            configValues.add(CherrygramAppearanceConfig.TAB_TYPE_MIX);
+
+            configStringKeys.add(getString(R.string.CG_FoldersTypeTitles));
+            configValues.add(CherrygramAppearanceConfig.TAB_TYPE_TEXT);
+
+            configStringKeys.add(getString(R.string.CG_FoldersTypeIcons));
+            configValues.add(CherrygramAppearanceConfig.TAB_TYPE_ICON);
+
+            PopupHelper.show(configStringKeys, getString(R.string.AP_Tab_Style), configValues.indexOf(CherrygramAppearanceConfig.INSTANCE.getTabMode()), getContext(), i -> {
+                CherrygramAppearanceConfig.INSTANCE.setTabMode(configValues.get(i));
+                SettingsHelper.updateButtonValue(view, getTabModeValue());
+
+                foldersPreviewCell.updateTabIcons(true);
+                foldersPreviewCell.updateTabTitle(true);
+
+                if (parentLayout != null) parentLayout.rebuildAllFragmentViews(false, false);
+
+                getNotificationCenter().postNotificationName(NotificationCenter.dialogFiltersUpdated);
+            });
+        } else if (item.id == addStrokeRow) {
+            CherrygramAppearanceConfig.INSTANCE.setTabStyleStroke(!CherrygramAppearanceConfig.INSTANCE.getTabStyleStroke());
+            SettingsHelper.updateCheckState(view, CherrygramAppearanceConfig.INSTANCE.getTabStyleStroke());
+
+            foldersPreviewCell.invalidate();
+            if (parentLayout != null) parentLayout.rebuildAllFragmentViews(false, false);
+        } else if (item.id == folderNameAppHeaderRow) {
+            CherrygramAppearanceConfig.INSTANCE.setFolderNameInHeader(!CherrygramAppearanceConfig.INSTANCE.getFolderNameInHeader());
+            SettingsHelper.updateCheckState(view, CherrygramAppearanceConfig.INSTANCE.getFolderNameInHeader());
+
+            if (parentLayout != null) parentLayout.rebuildAllFragmentViews(false, false);
+
+            getNotificationCenter().postNotificationName(NotificationCenter.dialogFiltersUpdated);
+        } else if (item.id == foldersAtBottomRow) {
+            if (!DonatesManager.INSTANCE.didUserDonateForFeature()) {
+                AndroidUtilities.shakeViewSpring(view);
+                BotWebViewVibrationEffect.APP_ERROR.vibrate();
+                showDonateBulletin();
+                return;
+            }
+
+            CherrygramAppearanceConfig.INSTANCE.setFoldersAtBottom(!CherrygramAppearanceConfig.INSTANCE.getFoldersAtBottom());
+            SettingsHelper.updateCheckState(view, CherrygramAppearanceConfig.INSTANCE.getFoldersAtBottom());
+
+            showRestartBulletin();
+        } else if (item.id == telegramFoldersSettings) {
+            presentFragment(new FiltersSetupActivity());
+        }
+    }
+
+    @Override
+    protected boolean onLongClick(UItem item, View view, int position, float x, float y) {
+        return false;
+    }
+
+    private String getTabModeValue() {
+        return switch (CherrygramAppearanceConfig.INSTANCE.getTabMode()) {
+            case CherrygramAppearanceConfig.TAB_TYPE_MIX -> getString(R.string.CG_FoldersTypeIconsTitles);
+            case CherrygramAppearanceConfig.TAB_TYPE_ICON -> getString(R.string.CG_FoldersTypeIcons);
+            default -> getString(R.string.CG_FoldersTypeTitles);
+        };
+    }
+
+}

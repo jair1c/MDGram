@@ -47,6 +47,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.FileLoader;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.ImageReceiver;
@@ -82,6 +83,8 @@ import org.telegram.ui.ProfileActivity;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import uz.unnarsx.cherrygram.chats.helpers.ChatsHelper2;
 
 public class EmojiPacksAlert extends BottomSheet implements NotificationCenter.NotificationCenterDelegate {
 
@@ -511,10 +514,11 @@ public class EmojiPacksAlert extends BottomSheet implements NotificationCenter.N
 
         addButtonView = new TextView(context);
         addButtonView.setVisibility(View.GONE);
-        addButtonView.setBackground(Theme.AdaptiveRipple.filledRect(getThemedColor(Theme.key_featuredStickers_addButton), 6));
+        addButtonView.setBackground(Theme.AdaptiveRipple.filledRect(getThemedColor(Theme.key_featuredStickers_addButton), 24));
         addButtonView.setTextColor(getThemedColor(Theme.key_featuredStickers_buttonText));
         addButtonView.setTypeface(AndroidUtilities.bold());
         addButtonView.setGravity(Gravity.CENTER);
+        ScaleStateListAnimator.apply(addButtonView, .02f, 1.2f);
         buttonsView.addView(addButtonView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.BOTTOM, 12, 10, 12, 10));
 
         removeButtonView = new TextView(context);
@@ -981,7 +985,7 @@ public class EmojiPacksAlert extends BottomSheet implements NotificationCenter.N
         boolean openBgLight = AndroidUtilities.computePerceivedBrightness(getThemedColor(Theme.key_dialogBackground)) > .721f;
         boolean closedBgLight = AndroidUtilities.computePerceivedBrightness(Theme.blendOver(getThemedColor(Theme.key_actionBarDefault), 0x33000000)) > .721f;
         boolean isLight = open ? openBgLight : closedBgLight;
-        AndroidUtilities.setLightStatusBar(getWindow(), isLight);
+        AndroidUtilities.setLightStatusBar(this, isLight);
     }
 
     public void updateInstallment() {
@@ -1513,6 +1517,41 @@ public class EmojiPacksAlert extends BottomSheet implements NotificationCenter.N
             } catch (Exception e) {
                 FileLog.e(e);
             }
+        } else if (id == 3) {
+            String stickerSetID = String.valueOf(stickerSet.set.id);
+            try {
+                android.content.ClipboardManager clipboard = (android.content.ClipboardManager) ApplicationLoader.applicationContext.getSystemService(Context.CLIPBOARD_SERVICE);
+                android.content.ClipData clip = android.content.ClipData.newPlainText("label", stickerSetID);
+                clipboard.setPrimaryClip(clip);
+                Toast.makeText(getContext(), LocaleController.getString("TextCopied", R.string.TextCopied), Toast.LENGTH_SHORT).show();
+            } catch (Exception e) {
+                FileLog.e(e);
+            }
+        } else if (id == 4) {
+            long userId = stickerSet.set.id >> 32;
+
+            if ((stickerSet.set.id >> 16 & 0xff) == 0x3f) {
+                userId |= 0x80000000L;
+            }
+
+            if ((stickerSet.set.id >> 24 & 0xff) != 0) {
+                userId += 0x100000000L;
+            }
+
+            if (fragment != null) {
+                TLRPC.User user = fragment.getMessagesController().getUser(userId);
+                if (user != null) {
+                    dismiss();
+                    MessagesController.getInstance(currentAccount).openChatOrProfileWith(user, null, fragment, 0, false);
+                    return;
+                }
+            }
+
+            if (AndroidUtilities.addToClipboard("@dateregbot " + userId)) {
+                BulletinFactory.of((FrameLayout) containerView, resourcesProvider).createCopyLinkBulletin().show();
+            }
+        } else if (id == 5) {
+            ChatsHelper2.INSTANCE.updateStickerSetCache(fragment, stickerSet, true);
         }
     }
 
@@ -1654,7 +1693,7 @@ public class EmojiPacksAlert extends BottomSheet implements NotificationCenter.N
                 addButtonView = new TextView(context);
                 addButtonView.setTypeface(AndroidUtilities.bold());
                 addButtonView.setTextColor(getThemedColor(Theme.key_featuredStickers_buttonText));
-                addButtonView.setBackground(Theme.AdaptiveRipple.filledRect(getThemedColor(Theme.key_featuredStickers_addButton), 4));
+                addButtonView.setBackground(Theme.AdaptiveRipple.filledRect(getThemedColor(Theme.key_featuredStickers_addButton), 14));
                 addButtonView.setText(LocaleController.getString(R.string.Add));
                 addButtonView.setPadding(AndroidUtilities.dp(18), 0, AndroidUtilities.dp(18), 0);
                 addButtonView.setGravity(Gravity.CENTER);
@@ -1728,6 +1767,9 @@ public class EmojiPacksAlert extends BottomSheet implements NotificationCenter.N
                 addView(optionsButton, LayoutHelper.createFrame(40, 40, Gravity.TOP | Gravity.RIGHT, 0, 5, 5 - backgroundPaddingLeft / AndroidUtilities.density, 0));
                 optionsButton.addSubItem(1, R.drawable.msg_share, LocaleController.getString(R.string.StickersShare));
                 optionsButton.addSubItem(2, R.drawable.msg_link, LocaleController.getString(R.string.CopyLink));
+                optionsButton.addSubItem(3, R.drawable.msg_info, LocaleController.getString(R.string.CG_CopySetId));
+                optionsButton.addSubItem(4, R.drawable.msg_openprofile, LocaleController.getString(R.string.ChannelCreator));
+                optionsButton.addSubItem(5, R.drawable.msg_retry, LocaleController.getString(R.string.ClearMediaCache));
                 optionsButton.setOnClickListener(v -> optionsButton.toggleSubMenu());
                 optionsButton.setDelegate(EmojiPacksAlert.this::onSubItemClick);
                 optionsButton.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));

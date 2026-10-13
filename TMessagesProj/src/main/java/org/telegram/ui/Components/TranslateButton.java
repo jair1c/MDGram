@@ -56,7 +56,7 @@ import org.telegram.ui.Stories.recorder.HintView2;
 import java.util.ArrayList;
 import java.util.List;
 
-public class TranslateButton extends FrameLayout {
+public class TranslateButton extends FrameLayout implements Theme.Colorable {
 
     private final int currentAccount;
     private final long dialogId;
@@ -114,7 +114,7 @@ public class TranslateButton extends FrameLayout {
         menuView.setImageResource(R.drawable.msg_mini_customize);
         menuView.setOnClickListener(e -> {
             final TLRPC.Chat chat = MessagesController.getInstance(currentAccount).getChat(-dialogId);
-            if (UserConfig.getInstance(currentAccount).isPremium() || chat != null && chat.autotranslation) {
+            if (org.telegram.messenger.MDGramTranslator.enabled() || UserConfig.getInstance(currentAccount).isPremium() || chat != null && chat.autotranslation) {
                 onMenuClick();
             } else {
                 onCloseClick();
@@ -125,6 +125,7 @@ public class TranslateButton extends FrameLayout {
         updateColors();
     }
 
+    @Override
     public void updateColors() {
         textView.setTextColor(Theme.getColor(Theme.key_chat_addContact, resourcesProvider));
         textView.setBackground(Theme.createInsetRoundRectDrawable(Theme.getColor(Theme.key_chat_addContact, resourcesProvider) & 0x19ffffff, dp(15), dp(3)));
@@ -296,7 +297,7 @@ public class TranslateButton extends FrameLayout {
             popupLayout.getSwipeBack().openForeground(swipeBackIndex);
         });
 
-        if (UserConfig.getInstance(currentAccount).isPremium() && detectedLanguageNameAccusative != null) {
+        if (!org.telegram.messenger.MDGramTranslator.enabled() && UserConfig.getInstance(currentAccount).isPremium() && detectedLanguageNameAccusative != null) {
             final ActionBarMenuSubItem dontTranslateButton = new ActionBarMenuSubItem(getContext(), false, false, resourcesProvider);
             String text;
             if (accusative[0]) {
@@ -390,7 +391,7 @@ public class TranslateButton extends FrameLayout {
         final TranslateController translateController = MessagesController.getInstance(currentAccount).getTranslateController();
         final TLRPC.Chat chat = MessagesController.getInstance(currentAccount).getChat(-dialogId);
         if (translateController.isTranslatingDialog(dialogId)) {
-            String detectedLanguage = translateController.getDialogDetectedLanguage(dialogId);
+            String detectedLanguage = org.telegram.messenger.MDGramTranslator.enabled() ? null : translateController.getDialogDetectedLanguage(dialogId);
             detectedLanguage = TranslateAlert2.languageName(detectedLanguage);
             if (!TextUtils.isEmpty(detectedLanguage)) {
                 textView.setText(TextUtils.concat(translateIcon, " ", LocaleController.formatString(R.string.ShowOriginalButtonLanguage, detectedLanguage)));
@@ -411,7 +412,7 @@ public class TranslateButton extends FrameLayout {
             }
             textView.setText(TextUtils.concat(translateIcon, " ", text));
         }
-        menuView.setImageResource(UserConfig.getInstance(currentAccount).isPremium() || chat != null && chat.autotranslation ? R.drawable.msg_mini_customize : R.drawable.msg_close);
+        menuView.setImageResource(org.telegram.messenger.MDGramTranslator.enabled() || UserConfig.getInstance(currentAccount).isPremium() || chat != null && chat.autotranslation ? R.drawable.msg_mini_customize : R.drawable.msg_close);
     }
 
     public static void showCocoonAlert(Context context, Theme.ResourcesProvider resourcesProvider) {

@@ -53,11 +53,13 @@ import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_phone;
+import org.telegram.tgnet.tl.TL_update;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BackDrawable;
+import org.telegram.messenger.AccountInstance;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
@@ -65,7 +67,6 @@ import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Cells.CheckBoxCell;
 import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Cells.LoadingCell;
-import org.telegram.ui.Cells.LocationCell;
 import org.telegram.ui.Cells.ProfileSearchCell;
 import org.telegram.ui.Cells.ShadowSectionCell;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
@@ -121,6 +122,8 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import uz.unnarsx.cherrygram.core.configs.CherrygramAppearanceConfig;
 
 public class CallLogActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate, MainTabsActivity.TabFragmentDelegate {
 	private final int ADDITIONAL_LIST_HEIGHT_DP = Build.VERSION.SDK_INT >= 31 ? 48 : 0;
@@ -704,6 +707,9 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 			needFinishFragment = arguments.getBoolean("needFinishFragment", true);
 			hasMainTabs = arguments.getBoolean("hasMainTabs", false);
 		}
+		if (hasMainTabs) {
+			iBlur3SourceColor.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
+		}
 
 		additionNavigationBarHeight = hasMainTabs ? dp(DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS) : 0;
 		additionFloatingButtonOffset = hasMainTabs ? dp(DialogsActivity.MAIN_TABS_HEIGHT + DialogsActivity.MAIN_TABS_MARGIN) : 0;
@@ -724,17 +730,30 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 	@SuppressLint("UseCompatLoadingForDrawables")
     @Override
 	public View createView(Context context) {
-		if (!hasMainTabs) {
-			actionBar.setBackButtonDrawable(new BackDrawable(false));
-		}
+		BackDrawable backDrawable = new BackDrawable(false);
+		backDrawable.setShowStick(!CherrygramAppearanceConfig.INSTANCE.getCenterTitle());
+		actionBar.setBackButtonDrawable(backDrawable);
 		actionBar.setAllowOverlayTitle(true);
 		actionBar.setTitle(getString(R.string.Calls));
+		if (hasMainTabs) {
+			actionBar.setForceLeftTitle(true);
+			actionBar.getTitleTextView().setTypeface(AndroidUtilities.getTypeface("fonts/LinotteFon.ttf"));
+		}
 		actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
 			@Override
 			public void onItemClick(int id) {
 				if (id == -1) {
 					if (actionBar.isActionModeShowed()) {
 						hideActionMode(true);
+					} else if (hasMainTabs && getParentLayout() != null) {
+						boolean switchedToChats = false;
+						for (BaseFragment fragment : getParentLayout().getFragmentStack()) {
+							if (fragment instanceof MainTabsActivity) {
+								switchedToChats = ((MainTabsActivity) fragment).openChatsTab(true);
+								break;
+							}
+						}
+						if (!switchedToChats) finishFragment();
 					} else {
 						finishFragment();
 					}
@@ -750,8 +769,8 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		otherItem.setOnClickListener(v -> showItemOptions());
 
 		listView = new UniversalRecyclerView(this, this::fillItems, this::onClick, this::onLongClick);
-		listView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray, resourceProvider));
-		listView.setSections();
+		listView.setBackgroundColor(Theme.getColor(hasMainTabs ? Theme.key_windowBackgroundWhite : Theme.key_windowBackgroundGray, resourceProvider));
+		if (!hasMainTabs) listView.setSections();
 		listView.adapter.setApplyBackground(false);
 		contentView = new SizeNotifierFrameLayout(context) {
 			@Override
@@ -833,11 +852,11 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		}));
 
 		fragmentView = contentView;
-		fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
+		fragmentView.setBackgroundColor(Theme.getColor(hasMainTabs ? Theme.key_windowBackgroundWhite : Theme.key_windowBackgroundGray));
 
 		flickerLoadingView = new FlickerLoadingView(context);
 		flickerLoadingView.setViewType(FlickerLoadingView.CALL_LOG_TYPE);
-		flickerLoadingView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
+		flickerLoadingView.setBackgroundColor(Theme.getColor(hasMainTabs ? Theme.key_windowBackgroundWhite : Theme.key_windowBackgroundGray));
 		flickerLoadingView.showDate(false);
 		emptyView = new EmptyTextProgressView(context, flickerLoadingView);
 		contentView.addView(emptyView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
@@ -889,7 +908,8 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		}
 
 		floatingButton = new FragmentFloatingButton(context, resourceProvider);
-		floatingButton.imageView.setImageResource(R.drawable.filled_calls_plus);
+		if (hasMainTabs) floatingButton.setRoundedSquare(true);
+		floatingButton.imageView.setImageResource(hasMainTabs ? R.drawable.ic_call : R.drawable.filled_calls_plus);
 		floatingButton.setContentDescription(getString(R.string.Call));
 		floatingButton.setOnClickListener(v -> openCreateCall());
 		contentView.addView(floatingButton, FragmentFloatingButton.createDefaultLayoutParams());
@@ -915,8 +935,8 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 				topPanelLayout.setViewVisible(fragmentContextViewWrapper, visibility == VISIBLE);
 			}
 		};
-		fragmentContextView.isInsideBubble = true;
 		fragmentContextViewWrapper.addView(fragmentContextView);
+		topPanelLayout.setCallFragmentContextView(fragmentContextView);
 		contentView.addView(topPanelLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP, 0, -14, 0, 0));
 		contentView.addView(actionBar);
 
@@ -925,7 +945,13 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		contentView.addView(headerShadowView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 5, Gravity.TOP));
 
 		actionBar.setDrawBlurBackground(contentView);
-		actionBar.setAdaptiveBackground(listView);
+		if (hasMainTabs) {
+			actionBar.setAdaptiveBackground(listView, false, Theme.key_windowBackgroundWhite, Theme.key_windowBackgroundWhite);
+			actionBar.setTitleColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
+			actionBar.setItemsColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueIcon), false);
+		} else {
+			actionBar.setAdaptiveBackground(listView);
+		}
 
 		Bulletin.addDelegate(this, new Bulletin.Delegate() {
 			@Override
@@ -952,22 +978,25 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		final boolean hasActiveCalls = !activeGroupCalls.isEmpty();
 		final boolean hasCalls = !calls.isEmpty();
 
-		if (hasActiveCalls || hasCalls) {
+		if (!hasMainTabs && (hasActiveCalls || hasCalls)) {
 			items.add(UItem.asButton(ID_CREATE_CALL, R.drawable.menu_call_create, getString(R.string.GroupCallCreate2)).accent());
-			if (!getUserConfig().showCallsTab) {
+			/*if (!getUserConfig().showCallsTab) {
 				items.add(UItem.asButton(ID_SHOW_IN_MAIN_TABS, R.drawable.menu_add_tab_24, getString(R.string.GroupCallShowInMainTabs)).accent());
-			}
+			}*/
 			items.add(UItem.asShadow(null));
 		}
 
 		if (hasActiveCalls) {
+			if (hasMainTabs) {
+				items.add(UItem.asHeader(getString(R.string.VoipChatActiveChats)));
+			}
 			for (Long chatId : activeGroupCalls) {
 				if (chatId == null) continue;
 				final TLRPC.Chat chat = getMessagesController().getChat(chatId);
 				if (chat == null) continue;
 				items.add(GroupCallCell.Factory.of(chat, this::onGroupCallClick));
 			}
-			items.add(UItem.asShadow(null));
+			if (!hasMainTabs) items.add(UItem.asShadow(null));
 		}
 		if (hasCalls) {
 			for (CallLogRow row : calls) {
@@ -1194,7 +1223,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		getConnectionsManager().sendRequest(req, (response, error) -> {
 			if (response != null) {
 				TLRPC.TL_messages_affectedFoundMessages res = (TLRPC.TL_messages_affectedFoundMessages) response;
-				TLRPC.TL_updateDeleteMessages updateDeleteMessages = new TLRPC.TL_updateDeleteMessages();
+				TL_update.TL_updateDeleteMessages updateDeleteMessages = new TL_update.TL_updateDeleteMessages();
 				updateDeleteMessages.messages = res.messages;
 				updateDeleteMessages.pts = res.pts;
 				updateDeleteMessages.pts_count = res.pts_count;
@@ -1555,7 +1584,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 
 	@Override
 	public boolean onBackPressed(boolean invoked) {
-		if (actionBar.isActionModeShowed()) {
+		if (actionBar != null && actionBar.isActionModeShowed()) {
 			if (invoked) hideActionMode(true);
 			return false;
 		}
@@ -1886,41 +1915,46 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 	}
 
 	private void openCreateCall() {
+		openCreateCall(this);
+	}
+
+	public static void openCreateCall(BaseFragment parent) {
 		Bundle args = new Bundle();
 		args.putBoolean("isCall", true);
+		final int account = parent.getCurrentAccount();
 		final GroupCreateActivity fragment = new GroupCreateActivity(args) {
 			@Override
 			protected void onCallUsersSelected(HashSet<Long> users, boolean video) {
 				if (users.size() == 1) {
-					final TLRPC.User user = getMessagesController().getUser(users.iterator().next());
-					TLRPC.UserFull userFull = getMessagesController().getUserFull(user.id);
+					final TLRPC.User user = MessagesController.getInstance(account).getUser(users.iterator().next());
+					TLRPC.UserFull userFull = MessagesController.getInstance(account).getUserFull(user.id);
 					if (userFull == null) {
 						final TLRPC.TL_users_getFullUser req = new TLRPC.TL_users_getFullUser();
-						req.id = getMessagesController().getInputUser(user.id);
-						getConnectionsManager().sendRequest(req, (res, err) -> AndroidUtilities.runOnUIThread(() -> {
+						req.id = MessagesController.getInstance(account).getInputUser(user.id);
+						ConnectionsManager.getInstance(account).sendRequest(req, (res, err) -> AndroidUtilities.runOnUIThread(() -> {
 							TLRPC.UserFull newUserFull = null;
 							if (res instanceof TLRPC.TL_users_userFull) {
 								final TLRPC.TL_users_userFull r = (TLRPC.TL_users_userFull) res;
-								MessagesController.getInstance(CallLogActivity.this.currentAccount).putUsers(r.users, false);
-								MessagesController.getInstance(CallLogActivity.this.currentAccount).putChats(r.chats, false);
+								MessagesController.getInstance(account).putUsers(r.users, false);
+								MessagesController.getInstance(account).putChats(r.chats, false);
 								newUserFull = r.full_user;
 							}
-							VoIPHelper.startCall(lastCallUser = user, video, newUserFull != null && newUserFull.video_calls_available, getParentActivity(), newUserFull, getAccountInstance());
+							VoIPHelper.startCall(user, video, newUserFull != null && newUserFull.video_calls_available, getParentActivity(), newUserFull, AccountInstance.getInstance(account));
 						}));
 						return;
 					}
-					VoIPHelper.startCall(lastCallUser = user, video, userFull != null && userFull.video_calls_available, getParentActivity(), userFull, getAccountInstance());
+					VoIPHelper.startCall(user, video, userFull != null && userFull.video_calls_available, getParentActivity(), userFull, AccountInstance.getInstance(account));
 				} else {
 					final TL_phone.createConferenceCall req = new TL_phone.createConferenceCall();
 					req.random_id = Utilities.random.nextInt();
-					ConnectionsManager.getInstance(currentAccount).sendRequest(req, (res, err) -> AndroidUtilities.runOnUIThread(() -> {
+					ConnectionsManager.getInstance(account).sendRequest(req, (res, err) -> AndroidUtilities.runOnUIThread(() -> {
 						if (res instanceof TLRPC.Updates) {
 							final TLRPC.Updates updates = (TLRPC.Updates) res;
-							MessagesController.getInstance(currentAccount).putUsers(updates.users, false);
-							MessagesController.getInstance(currentAccount).putChats(updates.chats, false);
+							MessagesController.getInstance(account).putUsers(updates.users, false);
+							MessagesController.getInstance(account).putChats(updates.chats, false);
 
 							TLRPC.GroupCall groupCall = null;
-							for (TLRPC.TL_updateGroupCall u : findUpdatesAndRemove(updates, TLRPC.TL_updateGroupCall.class)) {
+							for (TL_update.TL_updateGroupCall u : findUpdatesAndRemove(updates, TL_update.TL_updateGroupCall.class)) {
 								groupCall = u.call;
 							}
 
@@ -1931,21 +1965,21 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 								final TLRPC.TL_inputGroupCall inputGroupCall = new TLRPC.TL_inputGroupCall();
 								inputGroupCall.id = groupCall.id;
 								inputGroupCall.access_hash = groupCall.access_hash;
-								VoIPHelper.joinConference(LaunchActivity.instance, currentAccount, inputGroupCall, video, groupCall, users);
+								VoIPHelper.joinConference(LaunchActivity.instance, account, inputGroupCall, video, groupCall, users);
 							}
 						} else if (res instanceof TL_phone.groupCall) {
 							final TL_phone.groupCall r = (TL_phone.groupCall) res;
-							MessagesController.getInstance(currentAccount).putUsers(r.users, false);
-							MessagesController.getInstance(currentAccount).putChats(r.chats, false);
+							MessagesController.getInstance(account).putUsers(r.users, false);
+							MessagesController.getInstance(account).putChats(r.chats, false);
 							if (LaunchActivity.instance == null) {
 								return;
 							}
 							final TLRPC.TL_inputGroupCall inputGroupCall = new TLRPC.TL_inputGroupCall();
 							inputGroupCall.id = r.call.id;
 							inputGroupCall.access_hash = r.call.access_hash;
-							VoIPHelper.joinConference(LaunchActivity.instance, currentAccount, inputGroupCall, video, r.call, users);
+							VoIPHelper.joinConference(LaunchActivity.instance, account, inputGroupCall, video, r.call, users);
 						} else if (err != null) {
-							BulletinFactory.of(CallLogActivity.this)
+							BulletinFactory.of(parent)
 								.showForError(err);
 						}
 					}));
@@ -1953,7 +1987,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 				finishFragment();
 			}
 		};
-		presentFragment(fragment);
+		parent.presentFragment(fragment);
 	}
 
 	public static void createCallLink(Context context, int currentAccount, Theme.ResourcesProvider resourceProvider, Runnable done) {
@@ -1969,7 +2003,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 				MessagesController.getInstance(currentAccount).putChats(updates.chats, false);
 
 				TLRPC.GroupCall groupCall = null;
-				for (TLRPC.TL_updateGroupCall u : findUpdatesAndRemove(updates, TLRPC.TL_updateGroupCall.class)) {
+				for (TL_update.TL_updateGroupCall u : findUpdatesAndRemove(updates, TL_update.TL_updateGroupCall.class)) {
 					groupCall = u.call;
 				}
 				progressDialog.dismiss();
@@ -2013,7 +2047,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 		ItemOptions io = ItemOptions.makeOptions(this, otherItem);
 		// io.setColors(getThemedColor(Theme.key_actionBarDefaultTitle), getThemedColor(Theme.key_actionBarDefaultTitle));
 		io.setDimAlpha(0x08);
-		if (getUserConfig().showCallsTab) {
+		/*if (getUserConfig().showCallsTab) {
 			io.add(R.drawable.msg_archive_hide, getString(R.string.HideCallTab), () -> {
 				setCallsTabVisible(false);
 				final BulletinFactory factory = hasMainTabs ? BulletinFactory.global() : BulletinFactory.of(CallLogActivity.this);
@@ -2021,7 +2055,7 @@ public class CallLogActivity extends BaseFragment implements NotificationCenter.
 					setCallsTabVisible(true);
 				}).setDuration(Bulletin.DURATION_PROLONG).show();
 			});
-		}
+		}*/
 		io.add(R.drawable.msg_delete, getString(R.string.DeleteAllCalls), true, () -> showDeleteAlert(true));
 
 		io.show();

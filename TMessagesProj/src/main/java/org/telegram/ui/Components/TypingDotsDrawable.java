@@ -18,6 +18,9 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.UserConfig;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.ChatActivity;
+
+import uz.unnarsx.cherrygram.core.configs.CherrygramChatsConfig;
 
 public class TypingDotsDrawable extends StatusDrawable {
 
@@ -29,6 +32,7 @@ public class TypingDotsDrawable extends StatusDrawable {
     private long lastUpdateTime = 0;
     private boolean started = false;
     private DecelerateInterpolator decelerateInterpolator = new DecelerateInterpolator();
+    private boolean ignoreAnimationLocks;
 
     private Paint currentPaint;
 
@@ -36,6 +40,17 @@ public class TypingDotsDrawable extends StatusDrawable {
         if (createPaint) {
             currentPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         }
+    }
+
+    public TypingDotsDrawable(boolean createPaint, ChatActivity parentFragment) {
+        if (createPaint) {
+            currentPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        }
+        this.chatActivity = parentFragment;
+    }
+
+    public void setIgnoreAnimationLocks() {
+        this.ignoreAnimationLocks = true;
     }
 
     @Override
@@ -79,7 +94,7 @@ public class TypingDotsDrawable extends StatusDrawable {
             }
         }
 
-        invalidateSelf();
+        invalidateLimited();
     }
 
     public void start() {
@@ -101,6 +116,7 @@ public class TypingDotsDrawable extends StatusDrawable {
 
     @Override
     public void draw(Canvas canvas) {
+        int x = getBounds().left;
         int y;
         if (isChat) {
             y = AndroidUtilities.dp(8.5f) + getBounds().top;
@@ -115,20 +131,36 @@ public class TypingDotsDrawable extends StatusDrawable {
             paint = currentPaint;
         }
 
-        canvas.drawCircle(AndroidUtilities.dp(3), y, scales[0] * AndroidUtilities.density, paint);
-        canvas.drawCircle(AndroidUtilities.dp(9), y, scales[1] * AndroidUtilities.density, paint);
-        canvas.drawCircle(AndroidUtilities.dp(15), y, scales[2] * AndroidUtilities.density, paint);
+        if (centerChatTitle && chatActivity != null) {
+            float centerX = getBounds().centerX();
+
+            float dot1X = centerX - AndroidUtilities.dp(6); // left dot
+            float dot2X = centerX; // centered dot
+            float dot3X = centerX + AndroidUtilities.dp(6); // right dot
+
+            canvas.drawCircle(dot1X, y, scales[0] * AndroidUtilities.density, paint);
+            canvas.drawCircle(dot2X, y, scales[1] * AndroidUtilities.density, paint);
+            canvas.drawCircle(dot3X, y, scales[2] * AndroidUtilities.density, paint);
+        } else {
+            canvas.drawCircle(x + AndroidUtilities.dp(3), y, scales[0] * AndroidUtilities.density, paint);
+            canvas.drawCircle(x + AndroidUtilities.dp(9), y, scales[1] * AndroidUtilities.density, paint);
+            canvas.drawCircle(x + AndroidUtilities.dp(15), y, scales[2] * AndroidUtilities.density, paint);
+        }
         checkUpdate();
     }
 
     private void checkUpdate() {
         if (started) {
-            if (!NotificationCenter.getInstance(currentAccount).isAnimationInProgress()) {
+            if (!NotificationCenter.getInstance(currentAccount).isAnimationInProgress() || ignoreAnimationLocks) {
                 update();
             } else {
                 AndroidUtilities.runOnUIThread(this::checkUpdate, 100);
             }
         }
+    }
+
+    public boolean isStarted() {
+        return started;
     }
 
     @Override
@@ -138,7 +170,9 @@ public class TypingDotsDrawable extends StatusDrawable {
 
     @Override
     public void setColorFilter(ColorFilter cf) {
-
+        if (currentPaint != null) {
+            currentPaint.setColorFilter(cf);
+        }
     }
 
     @Override
@@ -155,4 +189,10 @@ public class TypingDotsDrawable extends StatusDrawable {
     public int getIntrinsicHeight() {
         return AndroidUtilities.dp(18);
     }
+
+    /** Cherrygram start */
+    private boolean centerChatTitle = CherrygramChatsConfig.INSTANCE.getCenterChatTitle();
+    private ChatActivity chatActivity;
+    /** Cherrygram finish */
+
 }

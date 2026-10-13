@@ -52,6 +52,7 @@ import org.telegram.tgnet.TLRPC;
 import org.telegram.tgnet.tl.TL_account;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.AlertDialog;
+import org.telegram.ui.ActionBar.BackDrawable;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ActionBar.ThemeDescription;
@@ -287,6 +288,9 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
                 }
             }
         });
+        if (parentLayout != null && parentLayout.isRightLayout()) {
+            actionBar.setBackButtonImage(R.drawable.ic_ab_close);
+        }
 
         listAdapter = new ListAdapter(context);
 
@@ -485,11 +489,29 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
                 }
             } else if (position == passkeysRow) {
                 if (Build.VERSION.SDK_INT < 28 || !BuildVars.SUPPORTS_PASSKEYS) return;
-                if (currentPasskeys != null && currentPasskeys.size() > 0) {
-                    presentFragment(new PasskeysActivity(currentPasskeys));
-                } else {
-                    PasskeysActivity.showLearnSheet(context, currentAccount, resourceProvider, true);
+                final TL_account.Password password = currentPassword;
+                if (password == null || !password.has_password) {
+                    BulletinFactory.of(PrivacySettingsActivity.this).createSimpleBulletin(
+                            R.raw.chats_infotip,
+                            AndroidUtilities.replaceTags(getString(R.string.PaymentCardSavePaymentInformationInfoLine2).replace("*", "**")),
+                            getString(R.string.Enable),
+                            () -> {
+                                if (currentPassword == null) {
+                                    return;
+                                }
+                                int type;
+                                if (TextUtils.isEmpty(currentPassword.email_unconfirmed_pattern)) {
+                                    type = TwoStepVerificationSetupActivity.TYPE_INTRO;
+                                } else {
+                                    type = TwoStepVerificationSetupActivity.TYPE_EMAIL_CONFIRM;
+                                }
+                                presentFragment(new TwoStepVerificationSetupActivity(type, currentPassword));
+                            }
+                    ).show();
+                    return;
                 }
+                if (currentPasskeys == null) return;
+                presentFragment(new PasskeysActivity(currentPasskeys));
             } else if (position == passcodeRow) {
                 presentFragment(PasscodeActivity.determineOpenFragment());
             } else if (position == secretWebpageRow) {
@@ -498,7 +520,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
                 } else {
                     getMessagesController().secretWebpagePreview = 1;
                 }
-                MessagesController.getGlobalMainSettings().edit().putInt("secretWebpage2", getMessagesController().secretWebpagePreview).commit();
+                MessagesController.getGlobalMainSettings().edit().putInt("secretWebpage2", getMessagesController().secretWebpagePreview).apply();
                 if (view instanceof TextCheckCell) {
                     ((TextCheckCell) view).setChecked(getMessagesController().secretWebpagePreview == 1);
                 }
@@ -1312,7 +1334,7 @@ public class PrivacySettingsActivity extends BaseFragment implements Notificatio
                             count = String.format(LocaleController.getInstance().getCurrentLocale(), "%d", devicesActivityPreload.getSessionsCount());
                         }
                         getMessagesController().lastKnownSessionsCount = devicesActivityPreload.getSessionsCount();
-                        textCell2.setTextAndValueAndIcon(getString("SessionsTitle", R.string.SessionsTitle), count, true, R.drawable.msg2_devices, false);
+                        textCell2.setTextAndValueAndIcon(getString(R.string.SessionsTitle), count, true, R.drawable.msg2_devices, false);
                     } else if (position == emailLoginRow) {
                         CharSequence val = "";
                         if (currentPassword == null) {

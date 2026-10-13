@@ -14,16 +14,29 @@ import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.TextCheckCell;
-import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Components.LayoutHelper;
 
 // MDGram: pantalla "Otros Mods" del hub. Réplica del original: una sola opción (notificación persistente).
 public class OtrosModsSettingsActivity extends BaseFragment {
 
+    private void showAdditionalOptions(Context context) {
+        new android.app.AlertDialog.Builder(context)
+                .setTitle("Opciones adicionales")
+                .setMultiChoiceItems(new String[]{"Ocultar pantallas de Premium"},
+                        new boolean[]{MDGramConfig.hidePremiumScreens()},
+                        (dialog, which, checked) -> MDGramConfig.setHidePremiumScreens(checked))
+                .setPositiveButton("Cerrar", null)
+                .show();
+    }
+
     @Override
     public View createView(Context context) {
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
-        actionBar.setAllowOverlayTitle(true);
+        actionBar.setForceLeftTitle(true);
+        actionBar.setCastShadows(false);
+        actionBar.setItemsColor(0xFF319DFA, false);
+        actionBar.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        actionBar.createMenu().addItem(1, R.drawable.ic_ab_other);
         actionBar.setTitle("Otros Mods");
         if (AndroidUtilities.isTablet()) {
             actionBar.setOccupyStatusBar(false);
@@ -33,12 +46,14 @@ public class OtrosModsSettingsActivity extends BaseFragment {
             public void onItemClick(int id) {
                 if (id == -1) {
                     finishFragment();
+                } else if (id == 1) {
+                    showAdditionalOptions(context);
                 }
             }
         });
 
         FrameLayout root = new FrameLayout(context);
-        root.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
+        root.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
 
         ScrollView scroll = new ScrollView(context);
         scroll.setVerticalScrollBarEnabled(false);
@@ -55,6 +70,7 @@ public class OtrosModsSettingsActivity extends BaseFragment {
 
         // Notificación persistente (FUNCIONAL → MDGramResidentService)
         TextCheckCell resident = new TextCheckCell(context);
+        resident.applyMDGramSettingsStyle();
         resident.setTextAndCheck("Mostrar notificación persistente", MDGramConfig.residentNotification(), true);
         resident.setOnClickListener(v -> {
             boolean c = !resident.isChecked();
@@ -63,20 +79,6 @@ public class OtrosModsSettingsActivity extends BaseFragment {
             MDGramResidentService.update();
         });
         group.addView(resident);
-
-        // Ocultar pantallas de comprar Premium (FUNCIONAL → gatea PremiumPreviewFragment + PremiumFeatureBottomSheet)
-        TextCheckCell hidePremium = new TextCheckCell(context);
-        hidePremium.setTextAndValueAndCheck("Ocultar pantallas de Premium", "Bloquea las pantallas de comprar Telegram Premium", MDGramConfig.hidePremiumScreens(), true, false);
-        hidePremium.setOnClickListener(v -> {
-            boolean c = !hidePremium.isChecked();
-            hidePremium.setChecked(c);
-            MDGramConfig.setHidePremiumScreens(c);
-        });
-        group.addView(hidePremium);
-
-        TextInfoPrivacyCell info = new TextInfoPrivacyCell(context);
-        info.setText("La notificación persistente mantiene MDGram en segundo plano. Ocultar pantallas de Premium bloquea las pantallas de compra (no afecta los límites del servidor).");
-        content.addView(info);
 
         fragmentView = root;
         return fragmentView;

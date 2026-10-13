@@ -422,17 +422,11 @@ public class Icon3D {
 
     public String loadFromAsset(Context context, String name) {
         StringBuilder sb = new StringBuilder();
-        InputStream is = null;
-        try {
-            is = context.getAssets().open(name);
-
-            BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
+        try (InputStream is = context.getAssets().open(name);BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
             String str;
             while ((str = br.readLine()) != null) {
                 sb.append(str).append("\n");
             }
-            br.close();
-            is.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

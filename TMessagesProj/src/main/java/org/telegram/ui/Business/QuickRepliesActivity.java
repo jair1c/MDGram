@@ -81,6 +81,8 @@ import org.telegram.ui.LaunchActivity;
 
 import java.util.ArrayList;
 
+import uz.unnarsx.cherrygram.core.configs.CherrygramAppearanceConfig;
+
 public class QuickRepliesActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
     private UniversalRecyclerView listView;
@@ -93,7 +95,9 @@ public class QuickRepliesActivity extends BaseFragment implements NotificationCe
 
     @Override
     public View createView(Context context) {
-        actionBar.setBackButtonDrawable(new BackDrawable(false));
+        BackDrawable backDrawable = new BackDrawable(false);
+        backDrawable.setShowStick(!CherrygramAppearanceConfig.INSTANCE.getCenterTitle());
+        actionBar.setBackButtonDrawable(backDrawable);
         actionBar.setAllowOverlayTitle(true);
         actionBar.setTitle(getString(R.string.BusinessReplies));
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
@@ -159,7 +163,7 @@ public class QuickRepliesActivity extends BaseFragment implements NotificationCe
         listView.adapter.setApplyBackground(false);
         listView.listenReorder(this::whenReordered);
         contentView.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-        actionBar.setAdaptiveBackground(listView);
+        actionBar.setAdaptiveBackground(listView, true);
 
         return fragmentView = contentView;
     }
@@ -168,7 +172,7 @@ public class QuickRepliesActivity extends BaseFragment implements NotificationCe
     private int repliesOrderId;
 
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
-        items.add(UItem.asTopView(getString(R.string.BusinessRepliesInfo), "RestrictedEmoji", "📝"));
+        items.add(UItem.asTopView(getString(R.string.BusinessReplies), getString(R.string.BusinessRepliesInfo), "RestrictedEmoji", "📝"));
         adapter.whiteSectionStart();
         if (QuickRepliesController.getInstance(currentAccount).canAddNew()) {
             items.add(UItem.asButton(BUTTON_ADD, R.drawable.msg_viewintopic, getString(R.string.BusinessRepliesAdd)).accent());

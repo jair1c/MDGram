@@ -6,6 +6,8 @@ import static org.telegram.ui.Components.EditTextEmoji.STYLE_GIFT;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.text.Editable;
@@ -23,6 +25,7 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -45,8 +48,11 @@ import org.telegram.ui.Components.TypefaceSpan;
 public class EditEmojiTextCell extends FrameLayout {
 
     private boolean ignoreEditText;
-    public final EditTextEmoji editTextEmoji;
+    public EditTextEmoji editTextEmoji;
     private int maxLength;
+
+    private ImageView[] iconImageView = new ImageView[2];
+    private View codeDividerView;
 
     private boolean showLimitWhenEmpty;
     private int showLimitWhenNear = -1;
@@ -57,7 +63,7 @@ public class EditEmojiTextCell extends FrameLayout {
 
     private boolean allowEntities = true;
 
-    final AnimatedColor limitColor;
+    AnimatedColor limitColor;
     private int limitCount;
     final AnimatedTextView.AnimatedTextDrawable limit = new AnimatedTextView.AnimatedTextDrawable(false, true, true); {
         limit.setAnimationProperties(.2f, 0, 160, CubicBezierInterpolator.EASE_OUT_QUINT);
@@ -123,6 +129,10 @@ public class EditEmojiTextCell extends FrameLayout {
         return this;
     }
 
+    public EditEmojiTextCell(Context context, SizeNotifierFrameLayout parent, String hint, boolean multiline, int maxLength, int style, Theme.ResourcesProvider resourceProvider) {
+        this(context, parent, hint, multiline, maxLength, style, resourceProvider, null);
+    }
+
     public EditEmojiTextCell(
         Context context,
         SizeNotifierFrameLayout parent,
@@ -130,7 +140,8 @@ public class EditEmojiTextCell extends FrameLayout {
         boolean multiline,
         int maxLength,
         int style,
-        Theme.ResourcesProvider resourceProvider
+        Theme.ResourcesProvider resourceProvider,
+        OnClickListener onIconChangeListener
     ) {
         super(context);
         this.maxLength = maxLength;
@@ -266,7 +277,45 @@ public class EditEmojiTextCell extends FrameLayout {
         });
         addView(editTextEmoji, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP));
 
+        if (onIconChangeListener != null) {
+            setOnChangeIconListener(onIconChangeListener);
+        }
+
         updateLimitText();
+    }
+
+    public void setOnChangeIconListener(OnClickListener listener) {
+        editTextEmoji.setLayoutParams(LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.RIGHT | Gravity.TOP, 72 - 7 - 21, 0, 0, 0));
+
+        codeDividerView = new View(getContext());
+        codeDividerView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhiteInputField));
+        LinearLayout.LayoutParams params = LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 54, 10, 8, 10);
+        params.width = Math.max(4, AndroidUtilities.dp(0.5f));
+        params.height = Math.max(90, AndroidUtilities.dp(0.5f));
+        addView(codeDividerView, params);
+
+        for (int i = 0; i < iconImageView.length; i++) {
+            iconImageView[i] = new ImageView(getContext());
+            iconImageView[i].setFocusable(true);
+            iconImageView[i].setVisibility(i == 0 ? VISIBLE : GONE);
+            iconImageView[i].setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_stickers_menuSelector)));
+            iconImageView[i].setScaleType(ImageView.ScaleType.CENTER);
+            iconImageView[i].setOnClickListener(listener);
+            iconImageView[i].setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon), PorterDuff.Mode.MULTIPLY));
+            iconImageView[i].setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+            addView(iconImageView[i], LayoutHelper.createFrame(48, 48, Gravity.LEFT | Gravity.CENTER_VERTICAL, 12, 0, 8, 0));
+        }
+    }
+
+    public void setIcon(int icon, boolean animated) {
+        iconImageView[animated ? 1 : 0].setImageResource(icon);
+        if (animated) {
+            ImageView tmp = iconImageView[0];
+            iconImageView[0] = iconImageView[1];
+            iconImageView[1] = tmp;
+        }
+        AndroidUtilities.updateViewVisibilityAnimated(iconImageView[0], true, 0.5f, animated);
+        AndroidUtilities.updateViewVisibilityAnimated(iconImageView[1], false, 0.5f, animated);
     }
 
     public void setText(CharSequence text) {

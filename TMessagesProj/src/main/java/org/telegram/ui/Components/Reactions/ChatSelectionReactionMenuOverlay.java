@@ -299,8 +299,9 @@ public class ChatSelectionReactionMenuOverlay extends FrameLayout {
     }
 
     private boolean isMessageTypeAllowed(MessageObject obj) {
+        if (obj != null && obj.messageOwner != null && obj.messageOwner.rich_message != null) return true;
         return obj != null && !obj.needDrawBluredPreview() && (
-            MessageObject.isPhoto(obj.messageOwner) && MessageObject.getMedia(obj.messageOwner).webpage == null ||
+            obj.messageOwner != null && MessageObject.isPhoto(obj.messageOwner) && MessageObject.getMedia(obj.messageOwner) != null && MessageObject.getMedia(obj.messageOwner).webpage == null ||
             obj.getDocument() != null && (
                 MessageObject.isVideoDocument(obj.getDocument()) ||
                 MessageObject.isGifDocument(obj.getDocument())

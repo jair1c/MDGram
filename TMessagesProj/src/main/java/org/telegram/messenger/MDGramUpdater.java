@@ -2,6 +2,9 @@ package org.telegram.messenger;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
@@ -17,6 +20,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Arrays;
 
 // MDGram: motor de actualizaciones in-app (celda "Actualizar"). Consulta un manifiesto JSON remoto,
 // compara contra la versión MDGram local y devuelve la info si hay una versión más nueva.
@@ -117,7 +121,11 @@ public class MDGramUpdater {
                 String current = apkUrl;
                 int redirects = 0;
                 while (true) {
-                    conn = (HttpURLConnection) new URL(current).openConnection();
+                    URL downloadUrl = new URL(current);
+                    if (!"https".equalsIgnoreCase(downloadUrl.getProtocol())) {
+                        throw new Exception("La descarga debe usar HTTPS");
+                    }
+                    conn = (HttpURLConnection) downloadUrl.openConnection();
                     conn.setInstanceFollowRedirects(false);
                     conn.setConnectTimeout(20000);
                     conn.setReadTimeout(30000);
@@ -130,7 +138,7 @@ public class MDGramUpdater {
                         if (loc == null || ++redirects > 6) {
                             throw new Exception("too many redirects");
                         }
-                        current = loc;
+                        current = new URL(downloadUrl, loc).toString();
                         continue;
                     }
                     if (code != 200) {
@@ -164,6 +172,7 @@ public class MDGramUpdater {
                 out.flush();
                 out.close();
                 in.close();
+                validateDownloadedApk(outFile);
                 final long d = downloaded, t = total;
                 final File f = outFile;
                 AndroidUtilities.runOnUIThread(() -> {
@@ -171,6 +180,7 @@ public class MDGramUpdater {
                     listener.onComplete(f);
                 });
             } catch (Exception e) {
+                outFile.delete();
                 final String err = e.getMessage() != null ? e.getMessage() : "error";
                 AndroidUtilities.runOnUIThread(() -> listener.onError(err));
             } finally {
@@ -179,6 +189,33 @@ public class MDGramUpdater {
                 }
             }
         });
+    }
+
+    private static void validateDownloadedApk(File apk) throws Exception {
+        Context context = ApplicationLoader.applicationContext;
+        PackageManager manager = context.getPackageManager();
+        int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
+        PackageInfo downloaded = manager.getPackageArchiveInfo(apk.getAbsolutePath(), flags);
+        PackageInfo installed = manager.getPackageInfo(context.getPackageName(), flags);
+        if (downloaded == null || !context.getPackageName().equals(downloaded.packageName)) {
+            throw new Exception("El APK publicado pertenece a otro paquete de MDGram");
+        }
+        long downloadedCode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                ? downloaded.getLongVersionCode() : downloaded.versionCode;
+        long installedCode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                ? installed.getLongVersionCode() : installed.versionCode;
+        if (downloadedCode <= installedCode) {
+            throw new Exception("El APK publicado no es más reciente que esta instalación");
+        }
+        Signature[] downloadedSigners = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                ? downloaded.signingInfo.getApkContentsSigners() : downloaded.signatures;
+        Signature[] installedSigners = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                ? installed.signingInfo.getApkContentsSigners() : installed.signatures;
+        if (downloadedSigners == null || installedSigners == null
+                || !Arrays.equals(downloadedSigners, installedSigners)) {
+            throw new Exception("La firma del APK no coincide con MDGram instalado");
+        }
     }
 
     // ¿Puede la app instalar APKs? (Android 8+ exige el permiso "instalar de esta fuente" por app).

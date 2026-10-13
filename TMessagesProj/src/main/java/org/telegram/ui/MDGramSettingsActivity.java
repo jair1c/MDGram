@@ -25,7 +25,16 @@ import org.telegram.ui.Components.LayoutHelper;
 // MDGram: hub "Ajustes de MDGram" — réplica del hub del mod original: grid 2x2 + 3 filas + sección
 // TELEGRAM anidada (Ajustes de chats, Carpetas, Privacidad, Datos, Notificaciones). Íconos extraídos
 // del APK original (plantillas blancas) tintados con el color de cada sección.
-public class MDGramSettingsActivity extends BaseFragment {
+public class MDGramSettingsActivity extends BaseFragment implements MainTabsActivity.TabFragmentDelegate {
+    private final boolean hasMainTabs;
+
+    public MDGramSettingsActivity() {
+        this(false);
+    }
+
+    public MDGramSettingsActivity(boolean hasMainTabs) {
+        this.hasMainTabs = hasMainTabs;
+    }
 
     // colores de acento por ícono — muestreados EXACTO del hub del original (screenshot)
     private static final int C_GENERAL = 0xFF069DAC;   // teal
@@ -43,9 +52,13 @@ public class MDGramSettingsActivity extends BaseFragment {
 
     @Override
     public View createView(Context context) {
-        actionBar.setBackButtonImage(R.drawable.ic_ab_back);
-        actionBar.setAllowOverlayTitle(true);
-        actionBar.setTitle("Ajustes de MDGram");
+        if (!hasMainTabs) {
+            actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        }
+        actionBar.setTitle("");
+        actionBar.setCastShadows(false);
+        actionBar.setItemsColor(0xFF319DFA, false);
+        actionBar.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
         if (AndroidUtilities.isTablet()) {
             actionBar.setOccupyStatusBar(false);
         }
@@ -59,7 +72,11 @@ public class MDGramSettingsActivity extends BaseFragment {
         });
 
         FrameLayout root = new FrameLayout(context);
-        root.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
+        root.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        if (hasMainTabs) {
+            actionBar.setVisibility(View.GONE);
+            root.setPadding(0, AndroidUtilities.statusBarHeight + dp(24), 0, 0);
+        }
 
         ScrollView scroll = new ScrollView(context);
         scroll.setVerticalScrollBarEnabled(false);
@@ -67,26 +84,29 @@ public class MDGramSettingsActivity extends BaseFragment {
 
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(12), 0, dp(12), dp(16));
+        content.setPadding(dp(12), 0, dp(12), dp(hasMainTabs ? 100 : 16));
         scroll.addView(content, new FrameLayout.LayoutParams(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         // ---- cabecera "MDGram Messenger" / "Ajuste" ----
         TextView title = new TextView(context);
         title.setGravity(Gravity.CENTER);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 24);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 30);
         title.setTypeface(AndroidUtilities.bold());
         android.text.SpannableStringBuilder header = new android.text.SpannableStringBuilder("MDGram Messenger");
-        header.setSpan(new android.text.style.ForegroundColorSpan(getThemedColor(Theme.key_windowBackgroundWhiteBlueText2)), 0, 6, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        header.setSpan(new android.text.style.ForegroundColorSpan(0xFF1885F8), 0, 6, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         header.setSpan(new android.text.style.ForegroundColorSpan(getThemedColor(Theme.key_windowBackgroundWhiteBlackText)), 6, header.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         title.setText(header);
-        content.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 20, 0, 0));
+        content.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 18, 0, 0));
 
         TextView subtitle = new TextView(context);
         subtitle.setGravity(Gravity.CENTER);
-        subtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-        subtitle.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
+        subtitle.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        subtitle.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
         subtitle.setText("Ajuste");
-        content.addView(subtitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 18));
+        content.addView(subtitle, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, org.telegram.messenger.MDGramConfig.useNewNavigation() ? 24 : 42));
+        if (org.telegram.messenger.MDGramConfig.useNewNavigation()) {
+            content.addView(makeAccountCard(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 20));
+        }
 
         // ---- grid 2x2 ----
         LinearLayout row1 = new LinearLayout(context);
@@ -99,7 +119,7 @@ public class MDGramSettingsActivity extends BaseFragment {
         row2.setOrientation(LinearLayout.HORIZONTAL);
         row2.addView(makeGridCard(context, R.drawable.md_sett_home, C_HOME, "Pantalla principal", () -> presentFragment(new HomeSettingsActivity())), gridLp(true));
         row2.addView(makeGridCard(context, R.drawable.md_sett_others, C_MODS, "Otros mods", () -> presentFragment(new OtrosModsSettingsActivity())), gridLp(false));
-        content.addView(row2, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 0));
+        content.addView(row2, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 12, 0, 0));
 
         // ---- 3 filas completas ----
         content.addView(makeRow(context, R.drawable.md_themes_explorer, C_THEMES, "Explorar temas", () -> presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_THEMES_BROWSER))), rowLp());
@@ -112,32 +132,98 @@ public class MDGramSettingsActivity extends BaseFragment {
         tgHeader.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
         tgHeader.setTypeface(AndroidUtilities.bold());
         tgHeader.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueHeader));
-        content.addView(tgHeader, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 20, 0, 8));
-
         LinearLayout tgGroup = new LinearLayout(context);
         tgGroup.setOrientation(LinearLayout.VERTICAL);
-        tgGroup.setBackground(Theme.createRoundRectDrawable(dp(12), getThemedColor(Theme.key_windowBackgroundWhite)));
+        tgGroup.setBackground(Theme.createRoundRectDrawable(dp(22), cardColor()));
+        tgHeader.setPadding(dp(24), dp(18), 0, dp(14));
+        tgGroup.addView(tgHeader, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         addGroupedRow(context, tgGroup, R.drawable.md_sett_chat, C_CHAT, "Ajustes de chats", () -> presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_BASIC)), true);
         addGroupedRow(context, tgGroup, R.drawable.md_sett_filter, C_FOLDERS, "Carpetas de chats", () -> presentFragment(new FiltersSetupActivity()), false);
         addGroupedRow(context, tgGroup, R.drawable.md_sett_priv, C_PRIV, "Privacidad y seguridad", () -> presentFragment(new PrivacySettingsActivity()), false);
         addGroupedRow(context, tgGroup, R.drawable.md_sett_data, C_DATA, "Datos y almacenamiento", () -> presentFragment(new DataSettingsActivity()), false);
         addGroupedRow(context, tgGroup, R.drawable.md_sett_notify, C_NOTIFY, "Notificaciones y sonidos", () -> presentFragment(new NotificationsSettingsActivity()), false);
-        content.addView(tgGroup, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        content.addView(tgGroup, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 12, 0, 0));
 
         fragmentView = root;
         return fragmentView;
     }
 
     private LinearLayout.LayoutParams gridLp(boolean left) {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(96), 1f);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(104), 1f);
         if (left) lp.rightMargin = dp(5);
         else lp.leftMargin = dp(5);
         return lp;
     }
 
+    private void openAccountProfile() {
+        android.os.Bundle args = new android.os.Bundle();
+        args.putLong("user_id", getUserConfig().getClientUserId());
+        args.putBoolean("my_profile", true);
+        presentFragment(new ProfileActivity(args));
+    }
+
+    private View makeAccountCard(Context context) {
+        LinearLayout card = new LinearLayout(context);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(Theme.createRoundRectDrawable(dp(22), cardColor()));
+        FrameLayout account = new FrameLayout(context);
+        org.telegram.tgnet.TLRPC.User user = getUserConfig().getCurrentUser();
+        org.telegram.ui.Components.BackupImageView avatar = new org.telegram.ui.Components.BackupImageView(context);
+        avatar.setRoundRadius(dp(28));
+        avatar.setForUserOrChat(user, new org.telegram.ui.Components.AvatarDrawable(user));
+        account.addView(avatar, LayoutHelper.createFrame(56, 56, Gravity.LEFT | Gravity.CENTER_VERTICAL, 16, 0, 0, 0));
+        avatar.setOnClickListener(v -> openAccountProfile());
+        ImageView camera = icon(context, R.drawable.msg_camera, 0xFFFFFFFF, 16);
+        camera.setBackground(Theme.createRoundRectDrawable(dp(14), getThemedColor(Theme.key_windowBackgroundWhiteBlueText)));
+        camera.setPadding(dp(5), dp(5), dp(5), dp(5));
+        camera.setContentDescription("Cambiar foto de perfil");
+        camera.setOnClickListener(v -> openAccountProfile());
+        account.addView(camera, LayoutHelper.createFrame(28, 28, Gravity.LEFT | Gravity.CENTER_VERTICAL, 52, 20, 0, 0));
+        LinearLayout identity = new LinearLayout(context);
+        identity.setOrientation(LinearLayout.VERTICAL);
+        TextView name = new TextView(context);
+        name.setText(org.telegram.messenger.UserObject.getUserName(user));
+        name.setTypeface(AndroidUtilities.bold());
+        name.setTextSize(18);
+        name.setSingleLine(true);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        name.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
+        identity.addView(name);
+        TextView phone = new TextView(context);
+        phone.setText(org.telegram.messenger.MDGramConfig.hidePhoneNumber() ? "Número oculto" : user != null && user.phone != null ? org.telegram.PhoneFormat.PhoneFormat.getInstance().format("+" + user.phone) : "");
+        phone.setTextSize(13);
+        phone.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
+        identity.addView(phone);
+        identity.setOnClickListener(v -> presentFragment(new SettingsActivity(new android.os.Bundle())));
+        account.addView(identity, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 88, 0, 100, 0));
+        ImageView settings = icon(context, R.drawable.msg_settings, getThemedColor(Theme.key_windowBackgroundWhiteBlackText), 24);
+        settings.setPadding(dp(8), dp(8), dp(8), dp(8));
+        settings.setContentDescription("Gestionar cuenta");
+        settings.setOnClickListener(v -> presentFragment(new SettingsActivity(new android.os.Bundle())));
+        account.addView(settings, LayoutHelper.createFrame(40, 40, Gravity.RIGHT | Gravity.CENTER_VERTICAL, 0, 0, 54, 0));
+        ImageView qr = icon(context, R.drawable.outline_header_qr_24, getThemedColor(Theme.key_windowBackgroundWhiteBlackText), 24);
+        qr.setPadding(dp(8), dp(8), dp(8), dp(8));
+        qr.setContentDescription("Código QR de mi perfil");
+        qr.setOnClickListener(v -> {
+            android.os.Bundle args = new android.os.Bundle();
+            args.putLong("user_id", getUserConfig().getClientUserId());
+            presentFragment(new QrActivity(args));
+        });
+        account.addView(qr, LayoutHelper.createFrame(40, 40, Gravity.RIGHT | Gravity.CENTER_VERTICAL, 0, 0, 14, 0));
+        card.addView(account, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 96));
+        View line = new View(context);
+        line.setBackgroundColor(getThemedColor(Theme.key_divider));
+        card.addView(line, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1, 88, 0, 16, 0));
+        LinearLayout suggestions = new LinearLayout(context);
+        fillRow(context, suggestions, 0, 0, "Sugerencias de la cuenta");
+        suggestions.setOnClickListener(v -> presentFragment(new SettingsActivity(new android.os.Bundle())));
+        card.addView(suggestions, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 52));
+        return card;
+    }
+
     private LinearLayout.LayoutParams rowLp() {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LayoutHelper.MATCH_PARENT, dp(58));
-        lp.topMargin = dp(10);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LayoutHelper.MATCH_PARENT, dp(64));
+        lp.topMargin = dp(12);
         return lp;
     }
 
@@ -148,12 +234,17 @@ public class MDGramSettingsActivity extends BaseFragment {
         return iv;
     }
 
+    private int cardColor() {
+        return Theme.getActiveTheme() != null && Theme.getActiveTheme().isDark()
+                ? getThemedColor(Theme.key_windowBackgroundGray) : 0xFFF4F4F4;
+    }
+
     // tarjeta del grid
     private View makeGridCard(Context context, int res, int tint, String text, Runnable onClick) {
         FrameLayout card = new FrameLayout(context);
-        card.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(12), getThemedColor(Theme.key_windowBackgroundWhite), getThemedColor(Theme.key_listSelector)));
+        card.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(22), cardColor(), getThemedColor(Theme.key_listSelector)));
 
-        card.addView(icon(context, res, tint, 30), LayoutHelper.createFrame(30, 30, Gravity.TOP | Gravity.LEFT, 16, 16, 0, 0));
+        card.addView(icon(context, res, tint, 30), LayoutHelper.createFrame(30, 30, Gravity.TOP | Gravity.LEFT, 32, 23, 0, 0));
 
         TextView tv = new TextView(context);
         tv.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
@@ -161,9 +252,9 @@ public class MDGramSettingsActivity extends BaseFragment {
         tv.setTypeface(AndroidUtilities.bold());
         tv.setMaxLines(1);
         tv.setText(text);
-        card.addView(tv, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT, 16, 0, 30, 14));
+        card.addView(tv, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT, 30, 0, 30, 21));
 
-        card.addView(chevron(context), LayoutHelper.createFrame(16, 16, Gravity.BOTTOM | Gravity.RIGHT, 0, 0, 12, 16));
+        card.addView(chevron(context), LayoutHelper.createFrame(16, 16, Gravity.BOTTOM | Gravity.RIGHT, 0, 0, 19, 16));
         card.setOnClickListener(v -> onClick.run());
         return card;
     }
@@ -171,7 +262,7 @@ public class MDGramSettingsActivity extends BaseFragment {
     // fila completa (tarjeta propia)
     private View makeRow(Context context, int res, int tint, String text, Runnable onClick) {
         LinearLayout row = new LinearLayout(context);
-        row.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(12), getThemedColor(Theme.key_windowBackgroundWhite), getThemedColor(Theme.key_listSelector)));
+        row.setBackground(Theme.createSimpleSelectorRoundRectDrawable(dp(22), cardColor(), getThemedColor(Theme.key_listSelector)));
         fillRow(context, row, res, tint, text);
         row.setOnClickListener(v -> onClick.run());
         return row;
@@ -179,26 +270,19 @@ public class MDGramSettingsActivity extends BaseFragment {
 
     // fila dentro de un grupo (sin fondo propio; el grupo pone el fondo redondeado)
     private void addGroupedRow(Context context, LinearLayout group, int res, int tint, String text, Runnable onClick, boolean first) {
-        if (!first) {
-            View divider = new View(context);
-            divider.setBackgroundColor(getThemedColor(Theme.key_divider));
-            LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(LayoutHelper.MATCH_PARENT, 1);
-            dlp.leftMargin = dp(56);
-            group.addView(divider, dlp);
-        }
         LinearLayout row = new LinearLayout(context);
         row.setBackground(Theme.getSelectorDrawable(false));
         fillRow(context, row, res, tint, text);
         row.setOnClickListener(v -> onClick.run());
-        group.addView(row, new LinearLayout.LayoutParams(LayoutHelper.MATCH_PARENT, dp(52)));
+        group.addView(row, new LinearLayout.LayoutParams(LayoutHelper.MATCH_PARENT, dp(60)));
     }
 
     private void fillRow(Context context, LinearLayout row, int res, int tint, String text) {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(16), 0, dp(14), 0);
+        row.setPadding(dp(32), 0, dp(18), 0);
         row.setMinimumHeight(dp(52));
-        row.addView(icon(context, res, tint, 26), LayoutHelper.createLinear(26, 26, Gravity.CENTER_VERTICAL, 0, 0, 18, 0));
+        if (res != 0) row.addView(icon(context, res, tint, 26), LayoutHelper.createLinear(26, 26, Gravity.CENTER_VERTICAL, 0, 0, 18, 0));
         TextView tv = new TextView(context);
         tv.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
         tv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);

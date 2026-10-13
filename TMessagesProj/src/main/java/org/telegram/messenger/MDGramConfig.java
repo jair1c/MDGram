@@ -9,6 +9,11 @@ import android.content.SharedPreferences;
 // ocultar número OFF).
 public class MDGramConfig {
 
+    // v2 clears the obsolete separate-search slot so the four V21 tabs use the full width.
+    // v3 replaces Cherrygram's green "Blue Bubbles" baseline with Telegram's flat Day
+    // palette, which is the white/blue starting point used by MDGram V21.
+    private static final int VISUAL_DEFAULTS_VERSION = 3;
+
     // radio del difuminado de la foto de perfil (en dp), aplicado vía RenderEffect. Suave a propósito.
     public static final float PROFILE_BLUR_RADIUS_DP = 4f;
 
@@ -16,10 +21,59 @@ public class MDGramConfig {
         return ApplicationLoader.applicationContext.getSharedPreferences("mdgramconfig", Context.MODE_PRIVATE);
     }
 
+    /**
+     * Applies the MDGram V21 visual baseline once without touching the account/session database.
+     * Cherrygram stores these presentation options in mainconfig, so an applicationId migration
+     * can otherwise retain its own two-tab layout and hidden home search field.
+     */
+    public static void applyVisualDefaultsOnce() {
+        SharedPreferences mdgram = prefs();
+        if (mdgram.getInt("visual_defaults_version", 0) >= VISUAL_DEFAULTS_VERSION) {
+            return;
+        }
+
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("AP_CenterTitle", true)
+                .putBoolean("AP_HideSearchField", false)
+                .putInt("AP_Icon_Replacements1", 0)
+                .putBoolean("AP_DisableDividers", false)
+                .putBoolean("AP_ShowMainTabs", true)
+                .putString("AP_MainTabsPosition_New", "CONTACTS,CALLS,CHATS,SETTINGS,!PROFILE,!SEARCH")
+                .putBoolean("AP_ShowSearchInTabs_New", false)
+                .putBoolean("AP_ShowMainTabsTitle", true)
+                .putString("theme", "Day")
+                .apply();
+
+        ApplicationLoader.applicationContext.getSharedPreferences("themeconfig", Context.MODE_PRIVATE)
+                .edit()
+                .putString("lastDayTheme", "Day")
+                .putInt("accent_current_day.attheme", 0)
+                .apply();
+
+        mdgram.edit().putInt("visual_defaults_version", VISUAL_DEFAULTS_VERSION).apply();
+    }
+
+    public static boolean useNewNavigation() {
+        return prefs().getBoolean("use_new_navigation", false);
+    }
+
+    public static void setUseNewNavigation(boolean value) {
+        prefs().edit().putBoolean("use_new_navigation", value).apply();
+    }
+
+    public static boolean shouldShowV21Welcome() {
+        return !prefs().getBoolean("v21_welcome_shown", false);
+    }
+
+    public static void markV21WelcomeShown() {
+        prefs().edit().putBoolean("v21_welcome_shown", true).apply();
+    }
+
     // ---- General → cabecera de perfil del cajón lateral (MDGramSideDrawer) ----
 
     public static boolean profilePhotoAsBackground() {
-        return prefs().getBoolean("profile_photo_bg", true);
+        return prefs().getBoolean("profile_photo_bg", false);
     }
 
     public static void setProfilePhotoAsBackground(boolean v) {
@@ -170,7 +224,7 @@ public class MDGramConfig {
 
     public static int blurMenuIntensity() {
         if (blurMenuIntensityCache == null) {
-            blurMenuIntensityCache = prefs().getInt("blur_menu_intensity", 50);
+            blurMenuIntensityCache = prefs().getInt("blur_menu_intensity", 75);
         }
         return blurMenuIntensityCache;
     }
@@ -302,6 +356,41 @@ public class MDGramConfig {
 
     public static void setHomeTitleAsName(boolean v) {
         prefs().edit().putBoolean("home_title_name", v).apply();
+    }
+
+    // -1 preserves the existing Rounded/Outlined preference until a style is chosen.
+    public static boolean hideFolderCounters() {
+        return prefs().getBoolean("hide_folder_counters", false);
+    }
+
+    public static void setHideFolderCounters(boolean hidden) {
+        prefs().edit().putBoolean("hide_folder_counters", hidden).apply();
+    }
+
+    public static int folderStyle() {
+        return Math.max(-1, Math.min(4, prefs().getInt("folder_style", -1)));
+    }
+
+    public static void setFolderStyle(int style) {
+        prefs().edit().putInt("folder_style", Math.max(0, Math.min(4, style))).apply();
+    }
+
+    public static int homeTitleMode() {
+        // Existing enabled installations showed the full display name.
+        return Math.max(0, Math.min(3, prefs().getInt("home_title_mode", 1)));
+    }
+
+    public static void setHomeTitleMode(int mode) {
+        prefs().edit().putInt("home_title_mode", Math.max(0, Math.min(3, mode))).apply();
+    }
+
+    public static String homeTitle(int account) {
+        if (!homeTitleAsName() || homeTitleMode() == 0) return "MDGram";
+        if (homeTitleMode() == 3) return LocaleController.getString(R.string.MainTabsChats);
+        org.telegram.tgnet.TLRPC.User user = UserConfig.getInstance(account).getCurrentUser();
+        if (user == null) return "MDGram";
+        if (homeTitleMode() == 2 && user.first_name != null && !user.first_name.isEmpty()) return user.first_name;
+        return UserObject.getUserName(user);
     }
 
     // ---- Pantalla principal → "Ocultar botón flotante" (FAB, solo en la lista de chats principal). Default OFF.

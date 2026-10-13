@@ -42,6 +42,7 @@ import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.DrawerLayoutContainer;
 import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.ActivityWindowEmptyBackgroundDrawable;
 import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.PasscodeView;
@@ -75,7 +76,7 @@ public class ExternalActionActivity extends Activity implements INavigationLayou
 
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setTheme(R.style.Theme_TMessages);
-        getWindow().setBackgroundDrawableResource(R.drawable.transparent);
+        getWindow().setBackgroundDrawable(new ActivityWindowEmptyBackgroundDrawable());
         if (!SharedConfig.passcodeHash.isEmpty() && !SharedConfig.allowScreenCapture) {
             try {
                 getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
@@ -284,7 +285,7 @@ public class ExternalActionActivity extends Activity implements INavigationLayou
                     }
 
                     AlertDialog.Builder builder = new AlertDialog.Builder(ExternalActionActivity.this);
-                    builder.setTitle(LocaleController.getString(R.string.AppName));
+                    builder.setTitle(LocaleController.getString(R.string.CG_AppName));
                     builder.setMessage(LocaleController.getString(R.string.PleaseLoginPassport));
                     builder.setPositiveButton(LocaleController.getString(R.string.OK), null);
                     builder.show();
@@ -508,7 +509,7 @@ public class ExternalActionActivity extends Activity implements INavigationLayou
     protected void onPause() {
         super.onPause();
         actionBarLayout.onPause();
-        if (AndroidUtilities.isTablet()) {
+        if (AndroidUtilities.isTablet() && layersActionBarLayout != null) {
             layersActionBarLayout.onPause();
         }
         ApplicationLoader.externalInterfacePaused = true;

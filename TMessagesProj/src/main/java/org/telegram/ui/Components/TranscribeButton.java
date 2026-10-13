@@ -42,15 +42,23 @@ import org.telegram.messenger.R;
 import org.telegram.messenger.TranslateController;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
+import org.telegram.messenger.utils.DrawableUtils;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.ChatMessageCell;
+import org.telegram.ui.ChatActivity;
+import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.PremiumPreviewFragment;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
+
+import uz.unnarsx.cherrygram.chats.gemini.GeminiButtonsLayout;
+import uz.unnarsx.cherrygram.chats.gemini.GeminiResultsBottomSheet;
+import uz.unnarsx.cherrygram.chats.gemini.GeminiSDKImplementation;
+import uz.unnarsx.cherrygram.core.configs.CherrygramMessagesConfig;
 
 public class TranscribeButton {
 
@@ -209,6 +217,22 @@ public class TranscribeButton {
         if (parent == null) {
             return;
         }
+        if (useGeminiTranscription()) {
+            GeminiResultsBottomSheet.setMessageObject(parent.getMessageObject());
+            GeminiResultsBottomSheet.setCurrentChat(MessagesController.getInstance(UserConfig.selectedAccount).getChat(parent.getMessageObject().getChatId()));
+            GeminiSDKImplementation.injectGeminiForMedia(
+                    LaunchActivity.getSafeLastFragment(),
+                    (ChatActivity) LaunchActivity.getSafeLastFragment(),
+                    parent.getMessageObject(),
+                    false,
+                    true,
+                    false
+            );
+            pressed = false;
+            selectorDrawable.setState(StateSet.NOTHING);
+            parent.invalidate();
+            return;
+        }
         clickedToOpen = false;
         boolean processClick, toOpen = !shouldBeOpen;
         if (!shouldBeOpen) {
@@ -274,13 +298,13 @@ public class TranscribeButton {
         }
         if (newColor) {
             inIconDrawable.beginApplyLayerColors();
-            inIconDrawable.setLayerColor("Artboard Outlines.**", this.iconColor);
+            inIconDrawable.setLayerColor("Artboard Outlines", this.iconColor);
             inIconDrawable.commitApplyLayerColors();
             inIconDrawable.setAllowDecodeSingleFrame(true);
             inIconDrawable.updateCurrentFrame(0, false);
             inIconDrawable.setAlpha(inIconDrawableAlpha = (int) (Color.alpha(color)));
             outIconDrawable.beginApplyLayerColors();
-            outIconDrawable.setLayerColor("Artboard Outlines.**", this.iconColor);
+            outIconDrawable.setLayerColor("Artboard Outlines", this.iconColor);
             outIconDrawable.commitApplyLayerColors();
             outIconDrawable.setAllowDecodeSingleFrame(true);
             outIconDrawable.updateCurrentFrame(0, false);
@@ -403,7 +427,7 @@ public class TranscribeButton {
     private Path lockHandlePath;
 
     private void drawLock(Canvas canvas) {
-        final float alpha = animatedDrawLock.set(drawLock && !isOpen && !loading);
+        final float alpha = animatedDrawLock.set(drawLock && !isOpen && !loading && !useGeminiTranscription());
         if (alpha <= 0) {
             return;
         }
@@ -573,15 +597,28 @@ public class TranscribeButton {
         private RLottieDrawable lottie;
         private int lastColor;
         private Paint paint;
+        private final Drawable.Callback callback = new Callback() {
+            @Override
+            public void invalidateDrawable(@NonNull Drawable who) {
+                invalidateSelf();
+            }
+
+            @Override
+            public void scheduleDrawable(@NonNull Drawable who, @NonNull Runnable what, long when) {
+
+            }
+
+            @Override
+            public void unscheduleDrawable(@NonNull Drawable who, @NonNull Runnable what) {
+
+            }
+        };
+
         public LoadingPointsDrawable(TextPaint textPaint) {
             this.paint = textPaint;
             float fontSize = textPaint.getTextSize() * 0.89f;
-            lottie = new RLottieDrawable(R.raw.dots_loading, "dots_loading", (int) fontSize, (int) (fontSize * 1.25f)) {
-                @Override
-                protected boolean hasParentView() {
-                    return true;
-                }
-            };
+            lottie = new RLottieDrawable(R.raw.dots_loading, "dots_loading", (int) fontSize, (int) (fontSize * 1.25f));
+            lottie.setCallback(callback);
             lottie.setAutoRepeat(1);
             lottie.setCurrentFrame((int) (SystemClock.elapsedRealtime() / 16f % 60f));
             lottie.setAllowDecodeSingleFrame(true);
@@ -590,7 +627,7 @@ public class TranscribeButton {
 
         public void setColor(int color) {
             lottie.beginApplyLayerColors();
-            lottie.setLayerColor("Comp 1.**", color);
+            lottie.setLayerColor("Comp 1", color);
             lottie.commitApplyLayerColors();
             lottie.setAllowDecodeSingleFrame(true);
             lottie.updateCurrentFrame(0, false);
@@ -861,4 +898,10 @@ public class TranscribeButton {
         }
         return mc.transcribeAudioTrialCooldownUntil != 0 && cc.getCurrentTime() <= mc.transcribeAudioTrialCooldownUntil && mc.transcribeAudioTrialCurrentNumber <= 0;
     }
+
+    /** Cherrygram start */
+    public static boolean useGeminiTranscription() {
+        return GeminiButtonsLayout.geminiButtonsVisible() && CherrygramMessagesConfig.INSTANCE.getVoiceTranscriptionProvider() == CherrygramMessagesConfig.TRANSCRIPTION_PROVIDER_GEMINI;
+    }
+    /** Cherrygram finish */
 }

@@ -25,9 +25,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.ChatThemeController;
-import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.DocumentObject;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.FileLoader;
@@ -35,7 +33,6 @@ import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.ImageReceiver;
 import org.telegram.messenger.LocaleController;
-import org.telegram.messenger.MediaDataController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
@@ -43,6 +40,7 @@ import org.telegram.messenger.SvgHelper;
 import org.telegram.tgnet.TLObject;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.EmojiThemes;
+import org.telegram.ui.ActionBar.MessageDrawable;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ActionBar.theme.ITheme;
 import org.telegram.ui.ChatBackgroundDrawable;
@@ -147,8 +145,8 @@ public class ThemeSmallPreviewView extends FrameLayout implements NotificationCe
         clipPath.addRoundRect(rectF, INNER_RADIUS, INNER_RADIUS, Path.Direction.CW);
     }
 
-    Theme.MessageDrawable messageDrawableOut = new Theme.MessageDrawable(Theme.MessageDrawable.TYPE_TEXT, true, false);
-    Theme.MessageDrawable messageDrawableIn = new Theme.MessageDrawable(Theme.MessageDrawable.TYPE_TEXT, false, false);
+    MessageDrawable messageDrawableOut = new MessageDrawable(MessageDrawable.TYPE_TEXT, true, false);
+    MessageDrawable messageDrawableIn = new MessageDrawable(MessageDrawable.TYPE_TEXT, false, false);
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
@@ -498,6 +496,11 @@ public class ThemeSmallPreviewView extends FrameLayout implements NotificationCe
             color3 = wallPaperSettings.third_background_color;
             color4 = wallPaperSettings.fourth_background_color;
         }
+        // Wallpaper settings store RGB values; Android gradient colors need opaque alpha.
+        color1 |= 0xff000000;
+        if (color2 != 0) color2 |= 0xff000000;
+        if (color3 != 0) color3 |= 0xff000000;
+        if (color4 != 0) color4 |= 0xff000000;
         if (color2 != 0) {
             MotionBackgroundDrawable motionBackgroundDrawable = new MotionBackgroundDrawable(color1, color2, color3, color4, true);
             patternColor = motionBackgroundDrawable.getPatternColor();
@@ -702,14 +705,14 @@ public class ThemeSmallPreviewView extends FrameLayout implements NotificationCe
                         rectF.set(bubbleLeft, bubbleTop, bubbleLeft + BUBBLE_WIDTH * (currentType == TYPE_CHANNEL ? 1.2f : 1f), bubbleTop + BUBBLE_HEIGHT);
                     } else {
                         bubbleTop = getMeasuredHeight() * 0.12f;
-                        bubbleLeft = getMeasuredWidth() - getMeasuredWidth() * 0.65f;
-                        float bubbleRight = getMeasuredWidth() - getMeasuredWidth() * 0.1f;
+                        bubbleLeft = getMeasuredWidth() * (currentType == TYPE_GRID ? 0.36f : 0.35f);
+                        float bubbleRight = getMeasuredWidth() * (currentType == TYPE_GRID ? 0.85f : 0.9f);
                         float bubbleBottom = getMeasuredHeight() * 0.32f;
                         rectF.set(bubbleLeft, bubbleTop, bubbleRight, bubbleBottom);
                     }
 
                     Paint paint = currentType == TYPE_CHANNEL ? inBubblePaint : outBubblePaintSecond;
-                    if (currentType == TYPE_DEFAULT || currentType == TYPE_CHANNEL) {
+                    if (currentType == TYPE_DEFAULT || currentType == TYPE_CHANNEL || currentType == TYPE_GRID) {
                         canvas.drawRoundRect(rectF, rectF.height() * 0.5f, rectF.height() * 0.5f, paint);
                     } else {
                         messageDrawableOut.setBounds((int) rectF.left, (int) rectF.top - AndroidUtilities.dp(2), (int) rectF.right + AndroidUtilities.dp(4), (int) rectF.bottom + AndroidUtilities.dp(2));
@@ -723,13 +726,13 @@ public class ThemeSmallPreviewView extends FrameLayout implements NotificationCe
                         rectF.set(bubbleLeft, bubbleTop, bubbleLeft + BUBBLE_WIDTH * (currentType == TYPE_CHANNEL ? 0.8f : 1f), bubbleTop + BUBBLE_HEIGHT);
                     } else {
                         bubbleTop = getMeasuredHeight() * 0.35f;
-                        bubbleLeft = getMeasuredWidth() * 0.1f;
-                        float bubbleRight = getMeasuredWidth() * 0.65f;
+                        bubbleLeft = getMeasuredWidth() * (currentType == TYPE_GRID ? 0.12f : 0.1f);
+                        float bubbleRight = getMeasuredWidth() * (currentType == TYPE_GRID ? 0.62f : 0.65f);
                         float bubbleBottom = getMeasuredHeight() * 0.55f;
                         rectF.set(bubbleLeft, bubbleTop, bubbleRight, bubbleBottom);
                     }
 
-                    if (currentType == TYPE_DEFAULT || currentType == TYPE_CHANNEL) {
+                    if (currentType == TYPE_DEFAULT || currentType == TYPE_CHANNEL || currentType == TYPE_GRID) {
                         canvas.drawRoundRect(rectF, rectF.height() * 0.5f, rectF.height() * 0.5f, inBubblePaint);
 
                         if (themeUserByUserId != 0) {

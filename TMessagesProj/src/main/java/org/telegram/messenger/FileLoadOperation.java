@@ -31,6 +31,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipException;
 
+import uz.unnarsx.cherrygram.core.configs.CherrygramCoreConfig;
+
 public class FileLoadOperation {
 
     private final boolean FULL_LOGS = false;
@@ -286,12 +288,12 @@ public class FileLoadOperation {
     }
 
     private void updateParams() {
-        // MDGram: "Acelerador de velocidad de descarga" (General). Rápida=512KB/8, Ultra=1MB/12, No=stock 128KB/4.
-        if ((MDGramConfig.downloadSpeedBoost() == MDGramConfig.BOOST_AVERAGE || preloadPrefixSize > 0 || MessagesController.getInstance(currentAccount).getfileExperimentalParams) && !forceSmallChunk) {
+        int downloadBoost = MDGramConfig.downloadSpeedBoost();
+        if ((downloadBoost == CherrygramCoreConfig.BOOST_AVERAGE || preloadPrefixSize > 0 || MessagesController.getInstance(currentAccount).getfileExperimentalParams) && !forceSmallChunk) {
             downloadChunkSizeBig = 1024 * 512;
             maxDownloadRequests = 8;
             maxDownloadRequestsBig = 8;
-        } else if (MDGramConfig.downloadSpeedBoost() == MDGramConfig.BOOST_EXTREME && !forceSmallChunk) {
+        } else if (downloadBoost == CherrygramCoreConfig.BOOST_EXTREME) {
             downloadChunkSizeBig = 1024 * 1024;
             maxDownloadRequests = 12;
             maxDownloadRequestsBig = 12;
@@ -1585,9 +1587,9 @@ public class FileLoadOperation {
                 if (cacheFileTempLocal != null) {
                     if (ungzip) {
                         try {
-                            GZIPInputStream gzipInputStream = new GZIPInputStream(new FileInputStream(cacheFileTempLocal));
-                            FileLoader.copyFile(gzipInputStream, cacheFileGzipTemp, 1024 * 1024 * 2);
-                            gzipInputStream.close();
+                            try (GZIPInputStream gzipInputStream = new GZIPInputStream(new FileInputStream(cacheFileTempLocal))) {
+                                FileLoader.copyFile(gzipInputStream, cacheFileGzipTemp, 1024 * 1024 * 2);
+                            }
                             cacheFileTempLocal.delete();
                             cacheFileTempLocal = cacheFileGzipTemp;
                             ungzip = false;

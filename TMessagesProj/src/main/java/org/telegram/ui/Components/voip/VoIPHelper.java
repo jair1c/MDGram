@@ -67,9 +67,6 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 
-import org.telegram.messenger.MDGramConfig;
-import org.telegram.messenger.UserObject;
-
 public class VoIPHelper {
 
 	public static long lastCallTime = 0;
@@ -77,20 +74,20 @@ public class VoIPHelper {
 	private static final int VOIP_SUPPORT_ID = 4244000;
 
 	public static void startCall(TLRPC.User user, boolean videoCall, boolean canVideoCall, final Activity activity, TLRPC.UserFull userFull, AccountInstance accountInstance) {
-		startCall(user, videoCall, canVideoCall, activity, userFull, accountInstance, true);
+		startCall(user, videoCall, canVideoCall, activity, userFull, accountInstance, false);
 	}
 
-	public static void startCall(TLRPC.User user, boolean videoCall, boolean canVideoCall, final Activity activity, TLRPC.UserFull userFull, AccountInstance accountInstance, boolean checkConfirm) {
+	public static void startCall(TLRPC.User user, boolean videoCall, boolean canVideoCall, final Activity activity, TLRPC.UserFull userFull, AccountInstance accountInstance, boolean confirmed) {
 		if (activity == null) {
 			return;
 		}
-		if (checkConfirm && MDGramConfig.askBeforeCalling()) {
+		if (!confirmed && org.telegram.messenger.MDGramConfig.askBeforeCalling()) {
 			AlertDialog.Builder bldr = new AlertDialog.Builder(activity);
 			bldr.setTitle(LocaleController.getString(videoCall ? R.string.VideoCall : R.string.Call));
-			String name = user != null ? UserObject.getUserName(user) : "";
-			bldr.setMessage(String.format(Locale.getDefault(), videoCall ? "¿Deseas iniciar una videollamada con %s?" : "¿Deseas llamar a %s?", name));
+			String name = user != null ? org.telegram.messenger.UserObject.getUserName(user) : "";
+			bldr.setMessage(String.format(java.util.Locale.getDefault(), videoCall ? "¿Deseas iniciar una videollamada con %s?" : "¿Deseas llamar a %s?", name));
 			bldr.setPositiveButton(LocaleController.getString(R.string.Call), (dialog, which) -> {
-				startCall(user, videoCall, canVideoCall, activity, userFull, accountInstance, false);
+				startCall(user, videoCall, canVideoCall, activity, userFull, accountInstance, true);
 			});
 			bldr.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
 			try {
@@ -100,11 +97,11 @@ public class VoIPHelper {
 			}
 			return;
 		}
-		if (accountInstance == null ? MessagesController.getInstance(UserConfig.selectedAccount).isFrozen() : accountInstance.getMessagesController().isFrozen()) {
-			AccountFrozenAlert.show(accountInstance == null ? UserConfig.selectedAccount : accountInstance.getCurrentAccount());
-			return;
-		}
-		if (userFull != null && userFull.phone_calls_private) {
+        if (accountInstance == null ? MessagesController.getInstance(UserConfig.selectedAccount).isFrozen() : accountInstance.getMessagesController().isFrozen()) {
+            AccountFrozenAlert.show(accountInstance == null ? UserConfig.selectedAccount : accountInstance.getCurrentAccount());
+            return;
+        }
+        if (userFull != null && userFull.phone_calls_private) {
 			AlertsCreator.showCallsForbidden(activity, accountInstance.getCurrentAccount(), user.id, null);
 			return;
 		}
@@ -124,6 +121,14 @@ public class VoIPHelper {
 				bldr.show();
 			} catch (Exception e) {
 				FileLog.e(e);
+			}
+			return;
+		}
+
+		if (!confirmed && activity instanceof LaunchActivity) {
+			final BaseFragment lastFragment = ((LaunchActivity) activity).getActionBarLayout().getLastFragment();
+			if (lastFragment != null) {
+				AlertsCreator.createCallDialogAlert(lastFragment, lastFragment.getMessagesController().getUser(user.id), videoCall);
 			}
 			return;
 		}
@@ -700,7 +705,7 @@ public class VoIPHelper {
 					}
 					if (includeLogs[0] && log.exists() && req.rating < 4) {
 						AccountInstance accountInstance = AccountInstance.getInstance(UserConfig.selectedAccount);
-						SendMessagesHelper.prepareSendingDocument(accountInstance, log.getAbsolutePath(), log.getAbsolutePath(), null, TextUtils.join(" ", problemTags), "text/plain", VOIP_SUPPORT_ID, null, null, null, null, null, true, 0, null, null, 0, false);
+						SendMessagesHelper.prepareSendingDocument(accountInstance, log.getAbsolutePath(), log.getAbsolutePath(), null, TextUtils.join(" ", problemTags), "text/plain", VOIP_SUPPORT_ID, null, null, null, null, null, true, 0, null, null, false);
 						Toast.makeText(context, LocaleController.getString(R.string.CallReportSent), Toast.LENGTH_LONG).show();
 					}
 				});
@@ -754,7 +759,7 @@ public class VoIPHelper {
 			boolean force = preferences.getBoolean("dbg_force_tcp_in_calls", false);
 			SharedPreferences.Editor editor = preferences.edit();
 			editor.putBoolean("dbg_force_tcp_in_calls", !force);
-			editor.commit();
+			editor.apply();
 			tcpCell.setChecked(!force);
 		});
 		ll.addView(tcpCell);
@@ -766,7 +771,7 @@ public class VoIPHelper {
 				boolean force = preferences.getBoolean("dbg_dump_call_stats", false);
 				SharedPreferences.Editor editor = preferences.edit();
 				editor.putBoolean("dbg_dump_call_stats", !force);
-				editor.commit();
+				editor.apply();
 				dumpCell.setChecked(!force);
 			});
 			ll.addView(dumpCell);
@@ -779,7 +784,7 @@ public class VoIPHelper {
 				boolean force = preferences.getBoolean("dbg_force_connection_service", false);
 				SharedPreferences.Editor editor = preferences.edit();
 				editor.putBoolean("dbg_force_connection_service", !force);
-				editor.commit();
+				editor.apply();
 				connectionServiceCell.setChecked(!force);
 			});
 			ll.addView(connectionServiceCell);

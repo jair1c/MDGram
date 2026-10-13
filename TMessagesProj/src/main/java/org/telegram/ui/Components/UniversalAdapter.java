@@ -39,10 +39,12 @@ import org.telegram.ui.Cells.GraySectionCell;
 import org.telegram.ui.Cells.HeaderCell;
 import org.telegram.ui.Cells.NotificationsCheckCell;
 import org.telegram.ui.Cells.ProfileSearchCell;
+import org.telegram.ui.Cells.RadioButtonCell;
 import org.telegram.ui.Cells.SlideIntChooseView;
 import org.telegram.ui.Cells.TextCell;
 import org.telegram.ui.Cells.TextCheckCell;
 import org.telegram.ui.Cells.TextCheckCell2;
+import org.telegram.ui.Cells.TextDetailSettingsCell;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Cells.TextRightIconCell;
 import org.telegram.ui.Cells.TextSettingsCell;
@@ -57,6 +59,8 @@ import org.telegram.ui.Stories.recorder.StoryPrivacyBottomSheet;
 import java.util.ArrayList;
 
 import me.vkryl.core.BitwiseUtils;
+
+import uz.unnarsx.cherrygram.core.configs.CherrygramAppearanceConfig;
 
 public class UniversalAdapter extends AdapterWithDiffUtils {
 
@@ -116,6 +120,7 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
     public static final int VIEW_TYPE_ROUND_GROUP_CHECKBOX = 41;
     public static final int VIEW_TYPE_ANIMATED_HEADER = 42;
     public static final int VIEW_TYPE_TEXT_SETTINGS = 43;
+    public static final int VIEW_TYPE_RADIO_2 = 44;
 
     protected final RecyclerListView listView;
     private final Context context;
@@ -172,18 +177,23 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
             return position >= start && position <= end;
         }
     }
+    public int itemsOffset = 0;
     private final ArrayList<Section> whiteSections = new ArrayList<>();
     private final ArrayList<Section> reorderSections = new ArrayList<>();
     private Section currentWhiteSection, currentReorderSection;
     public void whiteSectionStart() {
         currentWhiteSection = new Section();
-        currentWhiteSection.start = items.size();
+        currentWhiteSection.start = itemsOffset + items.size();
         currentWhiteSection.end = -1;
         whiteSections.add(currentWhiteSection);
     }
     public void whiteSectionEnd() {
         if (currentWhiteSection != null) {
-            currentWhiteSection.end = Math.max(0, items.size() - 1);
+            currentWhiteSection.end = Math.max(0, itemsOffset + items.size() - 1);
+            if (currentWhiteSection.start == currentWhiteSection.end) {
+                whiteSections.remove(currentWhiteSection);
+            }
+            currentWhiteSection = null;
         }
     }
 
@@ -230,12 +240,15 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
         if (fromPositionReorderId < 0 || fromPositionReorderId != toPositionReorderId) {
             return;
         }
-        UItem fromItem = items.get(fromPosition);
-        UItem toItem = items.get(toPosition);
         boolean fromItemHadDivider = hasDivider(fromPosition);
         boolean toItemHadDivider = hasDivider(toPosition);
-        items.set(fromPosition, toItem);
-        items.set(toPosition, fromItem);
+        // notifyItemMoved has MOVE semantics (remove at from, insert at to), not swap semantics.
+        // ItemTouchHelper.chooseDropTarget can return a non-adjacent target (especially while
+        // auto-scrolling at an edge, when several items pass under the finger per frame), so a
+        // plain items.set()/set() swap desyncs the adapter data from RecyclerView's bookkeeping
+        // -> duplicated/garbled rows. Move the element to match the notification for any distance.
+        UItem fromItem = items.remove(fromPosition);
+        items.add(toPosition, fromItem);
         notifyItemMoved(fromPosition, toPosition);
         if (hasDivider(toPosition) != fromItemHadDivider) {
             notifyItemChanged(toPosition, 3);
@@ -282,31 +295,29 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
     }
 
     public void update(boolean animated) {
+        if (listView != null && listView.isComputingLayout()) {
+            listView.post(() -> updateInternal(animated));
+        } else {
+            updateInternal(animated);
+        }
+    }
+
+    private void updateInternal(boolean animated) {
+        if (listView != null && listView.isComputingLayout())
+            return;
         oldItems.clear();
         oldItems.addAll(items);
         items.clear();
+        currentWhiteSection = null;
         whiteSections.clear();
         reorderSections.clear();
         if (fillItems != null) {
             fillItems.run(items, this);
             updateReorderSections();
-            if (listView != null && listView.isComputingLayout()) {
-                listView.post(() -> {
-                    if (listView.isComputingLayout()) {
-                        return;
-                    }
-                    if (animated) {
-                        setItems(oldItems, items);
-                    } else {
-                        notifyDataSetChanged();
-                    }
-                });
+            if (animated) {
+                setItems(oldItems, items);
             } else {
-                if (animated) {
-                    setItems(oldItems, items);
-                } else {
-                    notifyDataSetChanged();
-                }
+                notifyDataSetChanged();
             }
         }
     }
@@ -336,6 +347,7 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
             case VIEW_TYPE_CHECK:
             case VIEW_TYPE_CHECKRIPPLE:
             case VIEW_TYPE_RADIO:
+            case VIEW_TYPE_RADIO_2:
             case VIEW_TYPE_TEXT_CHECK:
             case VIEW_TYPE_ICON_TEXT_CHECK:
             case VIEW_TYPE_FULLSCREEN_CUSTOM:
@@ -356,6 +368,7 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
             case VIEW_TYPE_TRANSACTION:
             case VIEW_TYPE_PROCEED_OVERVIEW:
             case VIEW_TYPE_SPACE:
+            case VIEW_TYPE_SPACE_CG:
             case VIEW_TYPE_BUSINESS_LINK:
             case VIEW_TYPE_RIGHT_ICON_TEXT:
             case VIEW_TYPE_PROFILE_CELL:
@@ -368,6 +381,8 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
             case VIEW_TYPE_SWITCH:
             case VIEW_TYPE_EXPANDABLE_SWITCH:
             case VIEW_TYPE_TEXT_SETTINGS:
+            case VIEW_TYPE_CUSTOM_WITH_BACKGROUND:
+            case VIEW_TYPE_TEXT_DETAIL_SETTINGS:
                 return true;
         }
         return false;
@@ -411,7 +426,7 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                 view = new TopViewCell(context, resourcesProvider);
                 break;
             case VIEW_TYPE_TEXT:
-                view = new TextCell(context, resourcesProvider);
+                view = new TextCell(context, 21, false, false, resourcesProvider);
                 break;
             case VIEW_TYPE_CHECK:
             case VIEW_TYPE_CHECKRIPPLE:
@@ -427,18 +442,25 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
             case VIEW_TYPE_RADIO:
                 view = new DialogRadioCell(context);
                 break;
+            case VIEW_TYPE_RADIO_2:
+                view = new RadioButtonCell(context);
+                break;
             case VIEW_TYPE_TEXT_CHECK:
             case VIEW_TYPE_ICON_TEXT_CHECK:
                 view = new NotificationsCheckCell(context, 21, 60, viewType == VIEW_TYPE_ICON_TEXT_CHECK, resourcesProvider);
                 break;
             case VIEW_TYPE_CUSTOM:
             case VIEW_TYPE_CUSTOM_SHADOW:
+            case VIEW_TYPE_CUSTOM_WITH_BACKGROUND:
                 view = new FrameLayout(context) {
                     @Override
                     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
                         super.onMeasure(MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.EXACTLY), heightMeasureSpec);
                     }
                 };
+                if (viewType == VIEW_TYPE_CUSTOM_SHADOW) {
+                    view.setTag(RecyclerListView.TAG_NOT_SECTION);
+                }
                 break;
             case VIEW_TYPE_FULLY_CUSTOM:
                 view = new FrameLayout(context) {
@@ -503,7 +525,8 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                 view = new ChannelMonetizationLayout.ProceedOverviewCell(context, resourcesProvider);
                 break;
             case VIEW_TYPE_SPACE:
-                view = new View(context);
+            case VIEW_TYPE_SPACE_CG:
+                view = new SpaceView(context);
                 break;
             case VIEW_TYPE_BUSINESS_LINK:
                 view = new BusinessLinksActivity.BusinessLinkView(context, resourcesProvider);
@@ -560,6 +583,10 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
             case VIEW_TYPE_EXPANDABLE_SWITCH:
                 view = new TextCheckCell2(context);
                 break;
+            case VIEW_TYPE_TEXT_DETAIL_SETTINGS: {
+                view = new TextDetailSettingsCell(context);
+                break;
+            }
         }
         if (shouldApplyBackground(viewType)) {
             view.setBackgroundColor(getThemedColor(key_background));
@@ -616,6 +643,7 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
             case VIEW_TYPE_BLACK_HEADER:
             case VIEW_TYPE_LARGE_HEADER:
                 ((HeaderCell) holder.itemView).setText(item.text);
+                ((HeaderCell) holder.itemView).setEnabled(item.enabled, true);
                 break;
             case VIEW_TYPE_ANIMATED_HEADER:
                 HeaderCell animatedHeaderCell = (HeaderCell) holder.itemView;
@@ -643,12 +671,20 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                         topCell.setEmoji(item.iconResId);
                     }
                 } else {
+                    if (item.intValue != 0) {
+                        topCell.setEmojiSize(item.intValue);
+                    }
                     topCell.setEmoji(item.subtext.toString(), item.textValue.toString());
                 }
-                topCell.setText(item.text);
+                if (TextUtils.isEmpty(item.animatedText)) {
+                    topCell.setText(item.text);
+                } else {
+                    topCell.setText(item.text, item.animatedText);
+                }
                 break;
             case VIEW_TYPE_TEXT:
                 TextCell cell = (TextCell) holder.itemView;
+                cell.setEnabled(item.enabled, null);
                 if (item.object instanceof TLRPC.Document) {
                     cell.setTextAndSticker(item.text, (TLRPC.Document) item.object, divider);
                 } else if (item.object instanceof String) {
@@ -677,6 +713,7 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                 } else {
                     cell.setColors(Theme.key_windowBackgroundWhiteGrayIcon, Theme.key_windowBackgroundWhiteBlackText);
                 }
+                cell.setEnabled(item.enabled, true);
                 break;
             case VIEW_TYPE_CHECK:
             case VIEW_TYPE_CHECKRIPPLE:
@@ -686,12 +723,13 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                 }
                 checkCell.setEnabled(item.enabled, null);
                 checkCell.setTextAndCheck(item.text, item.checked, divider);
+                checkCell.setCheckBoxIcon(item.locked ? R.drawable.permission_locked : 0);
                 checkCell.itemId = item.id;
                 if (viewType == VIEW_TYPE_CHECKRIPPLE) {
                     holder.itemView.setBackgroundColor(Theme.getColor(item.checked ? Theme.key_windowBackgroundChecked : Theme.key_windowBackgroundUnchecked));
                 }
                 break;
-            case VIEW_TYPE_RADIO:
+            case VIEW_TYPE_RADIO: {
                 DialogRadioCell radioCell = (DialogRadioCell) holder.itemView;
                 if (radioCell.itemId == item.id) {
                     radioCell.setChecked(item.checked, true);
@@ -706,9 +744,18 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                 }
                 radioCell.itemId = item.id;
                 break;
+            }
+            case VIEW_TYPE_RADIO_2: {
+                RadioButtonCell radioCell = (RadioButtonCell) holder.itemView;
+                radioCell.setTextAndValue(item.text.toString(), item.textValue.toString(), divider, item.checked);
+                radioCell.itemId = item.id;
+                break;
+            }
             case VIEW_TYPE_TEXT_CHECK:
                 NotificationsCheckCell checkCell1 = (NotificationsCheckCell) holder.itemView;
-                final boolean multiline = item.subtext != null && item.subtext.toString().contains("\n");
+                final boolean multiline = /*item.subtext != null && item.subtext.toString().contains("\n")*/ true;
+                checkCell1.setEnabled(item.enabled, null);
+                if (item.locked) checkCell1.setCheckBoxIcon(R.drawable.permission_locked);
                 checkCell1.setTextAndValueAndCheck(item.text, item.subtext, item.checked, 0, multiline, divider);
                 break;
             case VIEW_TYPE_ICON_TEXT_CHECK:
@@ -751,42 +798,47 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                     }
                     cell3 = btn;
                 }
-                final boolean prev = prevItem != null && !isShadow(prevItem.viewType);
-                final boolean next = nextItem != null && !isShadow(nextItem.viewType);
-                if (listView.hasSections()) {
-                    cell3.setBackground(null);
-                } else {
-                    int drawable;
-                    if (prev && next) {
-                        drawable = R.drawable.greydivider;
-                    } else if (prev) {
-                        drawable = R.drawable.greydivider_bottom;
-                    } else if (next) {
-                        drawable = R.drawable.greydivider_top;
+                if (!CherrygramAppearanceConfig.INSTANCE.getDisableDividers()) {
+                    final boolean prev = prevItem != null && !isShadow(prevItem.viewType);
+                    final boolean next = nextItem != null && !isShadow(nextItem.viewType);
+                    if (listView.hasSections()) {
+                        cell3.setBackground(null);
                     } else {
-                        drawable = R.drawable.field_carret_empty;
-                    }
-                    Drawable shadowDrawable = Theme.getThemedDrawableByKey(context, drawable, Theme.key_windowBackgroundGrayShadow, resourcesProvider);
-                    if (dialog) {
-                        cell3.setBackground(new LayerDrawable(new Drawable[]{
-                                new ColorDrawable(getThemedColor(Theme.key_dialogBackgroundGray)),
-                                shadowDrawable
-                        }));
-                    } else {
-                        cell3.setBackground(shadowDrawable);
+                        int drawable;
+                        if (prev && next) {
+                            drawable = R.drawable.greydivider;
+                        } else if (prev) {
+                            drawable = R.drawable.greydivider_bottom;
+                        } else if (next) {
+                            drawable = R.drawable.greydivider_top;
+                        } else {
+                            drawable = R.drawable.field_carret_empty;
+                        }
+                        Drawable shadowDrawable = Theme.getThemedDrawableByKey(context, drawable, Theme.key_windowBackgroundGrayShadow, resourcesProvider);
+                        if (dialog) {
+                            cell3.setBackground(new LayerDrawable(new Drawable[]{
+                                    new ColorDrawable(getThemedColor(Theme.key_dialogBackgroundGray)),
+                                    shadowDrawable
+                            }));
+                        } else {
+                            cell3.setBackground(shadowDrawable);
+                        }
                     }
                 }
                 break;
             case VIEW_TYPE_CUSTOM:
             case VIEW_TYPE_CUSTOM_SHADOW:
             case VIEW_TYPE_FULLY_CUSTOM:
+            case VIEW_TYPE_CUSTOM_WITH_BACKGROUND:
                 FrameLayout frameLayout = (FrameLayout) holder.itemView;
+                frameLayout.setClipChildren(!item.checked);
+                frameLayout.setClipToPadding(!item.checked);
                 if (frameLayout.getChildCount() != (item.view == null ? 0 : 1) || frameLayout.getChildAt(0) != item.view) {
                     frameLayout.removeAllViews();
                     if (item.view != null) {
                         AndroidUtilities.removeFromParent(item.view);
                         FrameLayout.LayoutParams lp;
-                        if (viewType == VIEW_TYPE_CUSTOM || viewType == VIEW_TYPE_CUSTOM_SHADOW) {
+                        if (viewType == VIEW_TYPE_CUSTOM || viewType == VIEW_TYPE_CUSTOM_SHADOW || viewType == VIEW_TYPE_CUSTOM_WITH_BACKGROUND) {
                             lp = LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, item.intValue);
                         } else {
                             lp = LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT);
@@ -818,6 +870,7 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
             case VIEW_TYPE_USER_ADD:
                 UserCell userCell2 = (UserCell) holder.itemView;
                 userCell2.setFromUItem(currentAccount, item, divider);
+                userCell2.setQuery(item.textValue == null ? null : item.textValue.toString().toLowerCase());
                 userCell2.setAddButtonVisible(!item.checked);
                 userCell2.setCloseIcon(item.clickCallback);
                 break;
@@ -886,13 +939,14 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                 userCell1.setDivider(divider);
                 break;
             case VIEW_TYPE_SPACE:
+            case VIEW_TYPE_SPACE_CG:
                 if (item.transparent) {
                     holder.itemView.setBackgroundColor(0x00000000);
                 } else if (item.iconResId != 0) {
                     holder.itemView.setBackgroundColor(item.iconResId);
                 }
                 holder.itemView.setId(item.id);
-                holder.itemView.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, item.intValue));
+                ((SpaceView) holder.itemView).setHeight(item.intValue);
                 break;
             case VIEW_TYPE_BUSINESS_LINK:
                 BusinessLinksActivity.BusinessLinkView businessLinkView = (BusinessLinksActivity.BusinessLinkView) holder.itemView;
@@ -960,7 +1014,7 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                 }
                 profileCell.allowBotOpenButton(item.locked, item.object2 instanceof Utilities.Callback ? (Utilities.Callback) item.object2 : null);
                 profileCell.setRectangularAvatar(item.red);
-                profileCell.setData(object, null, title, s, false, false);
+                profileCell.setData(object, null, title, item.subtext != null ? item.subtext : s, false, false);
                 profileCell.setChecked(item.checked, false);
                 profileCell.useSeparator = divider;
                 break;
@@ -986,10 +1040,14 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
             case VIEW_TYPE_USER_GROUP_CHECKBOX:
                 CheckBoxCell checkBoxCell = (CheckBoxCell) holder.itemView;
                 checkBoxCell.setPad(item.pad);
-                checkBoxCell.setText(item.text, "", item.checked, divider, checkBoxCell.itemId == item.id);
+                if (item.subtext != null) {
+                    checkBoxCell.setText(item.text, item.subtext.toString(), item.checked, divider, checkBoxCell.itemId == item.id);
+                } else {
+                    checkBoxCell.setText(item.text, "", item.checked, divider, checkBoxCell.itemId == item.id);
+                }
                 checkBoxCell.itemId = item.id;
                 checkBoxCell.setIcon(item.locked ? R.drawable.permission_locked : 0);
-                if (viewType == VIEW_TYPE_USER_GROUP_CHECKBOX || viewType == VIEW_TYPE_ROUND_GROUP_CHECKBOX) {
+                if (item.subtext == null && (viewType == VIEW_TYPE_USER_GROUP_CHECKBOX || viewType == VIEW_TYPE_ROUND_GROUP_CHECKBOX)) {
                     checkBoxCell.setCollapseButton(item.collapsed, item.animatedText, item.clickCallback);
                 }
                 break;
@@ -1004,7 +1062,16 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
             case VIEW_TYPE_SWITCH:
             case VIEW_TYPE_EXPANDABLE_SWITCH:
                 TextCheckCell2 switchCell = (TextCheckCell2) holder.itemView;
-                switchCell.setTextAndCheck(item.text.toString(), item.checked, divider, switchCell.id == item.id);
+                if (item.iconResId != 0) {
+                    switchCell.setTextAndIconAndCheck(item.text, item.iconResId, item.checked, divider, switchCell.id == item.id);
+                } else {
+                    switchCell.setTextAndCheck(item.text, item.checked, divider, switchCell.id == item.id);
+                }
+                switchCell.setCheckBoxHidden(item.checkboxHidden);
+
+                switchCell.getCheckBox().setDrawIconType(item.intValue);
+                switchCell.getCheckBox().setColors(item.intValue == 0 ? Theme.key_switchTrack : Theme.key_fill_RedNormal,
+                    Theme.key_switchTrackChecked, Theme.key_windowBackgroundWhite, Theme.key_windowBackgroundWhite);
                 switchCell.id = item.id;
                 switchCell.setIcon(item.locked ? R.drawable.permission_locked : 0);
                 if (viewType == VIEW_TYPE_EXPANDABLE_SWITCH) {
@@ -1012,11 +1079,21 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                         switchCell.hideCollapseArrow();
                     } else {
                         switchCell.setCollapseArrow(item.animatedText.toString(), item.collapsed, () -> {
-                            item.clickCallback.onClick(switchCell);
+                            if (item.clickCallback != null) item.clickCallback.onClick(switchCell);
                         });
                     }
                 }
                 break;
+            case VIEW_TYPE_TEXT_DETAIL_SETTINGS: {
+                TextDetailSettingsCell textDetailSettingsCell = (TextDetailSettingsCell) holder.itemView;
+                textDetailSettingsCell.setMultilineDetail(true);
+                if (item.iconResId != 0 && item.textValue != null) {
+                    textDetailSettingsCell.setTextAndValueAndIcon(item.text.toString(), item.textValue, item.iconResId, divider);
+                } else if (item.textValue != null) {
+                    textDetailSettingsCell.setTextAndValue(item.text.toString(), item.textValue, divider);
+                }
+                break;
+            }
         }
         if (item.bind != null) {
             item.bind.run(holder.itemView);
@@ -1063,11 +1140,15 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
 
     public void updateReorder(RecyclerView.ViewHolder holder, boolean allowReorder) {
         if (holder == null) return;
+        final int position = holder.getAdapterPosition();
+        if (position == RecyclerView.NO_POSITION) return;
         final int viewType = holder.getItemViewType();
         if (viewType >= UItem.factoryViewTypeStartsWith) {
             UItem.UItemFactory<?> factory = UItem.findFactory(viewType);
             if (factory != null) {
-                factory.attachedView(listView, holder.itemView, getItem(holder.getAdapterPosition()));
+                UItem item = getItem(position);
+                if (item == null) return;
+                factory.attachedView(listView, holder.itemView, item);
             }
         } else {
             switch (viewType) {
@@ -1099,6 +1180,7 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                 viewType == VIEW_TYPE_RIGHT_ICON_TEXT ||
                 viewType == VIEW_TYPE_CHECK ||
                 viewType == VIEW_TYPE_RADIO ||
+                viewType == VIEW_TYPE_RADIO_2 ||
                 viewType == VIEW_TYPE_FILTER_CHAT ||
                 viewType == VIEW_TYPE_FILTER_CHAT_CHECK ||
                 viewType == VIEW_TYPE_LARGE_QUICK_REPLY ||
@@ -1114,7 +1196,8 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
                 viewType == VIEW_TYPE_ROUND_GROUP_CHECKBOX ||
                 viewType == VIEW_TYPE_SWITCH ||
                 viewType == VIEW_TYPE_EXPANDABLE_SWITCH ||
-                viewType == VIEW_TYPE_SHADOW_COLLAPSE_BUTTON
+                viewType == VIEW_TYPE_SHADOW_COLLAPSE_BUTTON ||
+                viewType == VIEW_TYPE_TEXT_DETAIL_SETTINGS
             );
         }
         return clickable && (item == null || item.enabled);
@@ -1195,4 +1278,46 @@ public class UniversalAdapter extends AdapterWithDiffUtils {
             this.minusPadding = minusPadding;
         }
     }
+
+    public static class SpaceView extends View {
+
+        private int height;
+        public SpaceView(Context context) {
+            super(context);
+            setTag(RecyclerListView.TAG_NOT_SECTION);
+        }
+
+        public void setHeight(int height) {
+            if (this.height == height) return;
+            this.height = height;
+            requestLayout();
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            super.onMeasure(
+                    MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(widthMeasureSpec), MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY)
+            );
+        }
+    }
+
+    /** Cherrygram start */
+    public static final int VIEW_TYPE_TEXT_DETAIL_SETTINGS = 100;
+    public static final int VIEW_TYPE_SPACE_CG = 101;
+    public static final int VIEW_TYPE_CUSTOM_WITH_BACKGROUND = 102;
+
+    public boolean isSectionStart(int position) {
+        int sectionId = getReorderSectionId(position);
+        if (sectionId < 0) return false;
+        return reorderSections.get(sectionId).start == position;
+    }
+
+    public boolean isSectionEnd(int position) {
+        int sectionId = getReorderSectionId(position);
+        if (sectionId < 0) return false;
+        return reorderSections.get(sectionId).end == position;
+    }
+    /** Cherrygram finish */
+
 }

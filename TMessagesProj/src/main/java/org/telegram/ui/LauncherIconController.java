@@ -15,37 +15,57 @@ public class LauncherIconController {
             }
         }
 
-        setIcon(LauncherIcon.DEFAULT);
+        setIcon(LauncherIcon.MDGRAM_DEFAULT);
     }
 
     public static boolean isEnabled(LauncherIcon icon) {
         Context ctx = ApplicationLoader.applicationContext;
         int i = ctx.getPackageManager().getComponentEnabledSetting(icon.getComponentName(ctx));
-        return i == PackageManager.COMPONENT_ENABLED_STATE_ENABLED || i == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && icon == LauncherIcon.DEFAULT;
+        return i == PackageManager.COMPONENT_ENABLED_STATE_ENABLED || i == PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && icon == LauncherIcon.MDGRAM_DEFAULT;
     }
 
     public static void setIcon(LauncherIcon icon) {
         Context ctx = ApplicationLoader.applicationContext;
         PackageManager pm = ctx.getPackageManager();
+        pm.setComponentEnabledSetting(icon.getComponentName(ctx), PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP);
         for (LauncherIcon i : LauncherIcon.values()) {
-            pm.setComponentEnabledSetting(i.getComponentName(ctx), i == icon ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED :
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
+            if (i != icon) {
+                try {
+                    pm.getActivityInfo(i.getComponentName(ctx), 0);
+                    pm.setComponentEnabledSetting(i.getComponentName(ctx), PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
+                } catch (PackageManager.NameNotFoundException ignored) {
+                    // Some Cherrygram icons are no longer declared in the MDGram manifest.
+                }
+            }
         }
     }
 
     public enum LauncherIcon {
-        DEFAULT("DefaultIcon", R.drawable.icon_background_sa, R.mipmap.icon_foreground_sa, R.string.AppIconDefault),
-        // MDGram: íconos propios extraídos del APK original (clave = nombre del activity-alias en el manifest)
-        MATERIALYOU("MaterialYouIcon", R.drawable.ic_materialyou_background, R.mipmap.ic_materialyou_foreground, R.string.AppIconMaterialYou),
-        ORANGE("OrangeIcon", R.mipmap.ic_orange_background, R.mipmap.ic_orange_foreground, R.string.AppIconOrange),
-        GREEN("GreenIcon", R.mipmap.ic_green_background, R.mipmap.ic_green_foreground, R.string.AppIconGreen),
-        YELLOW("YellowIcon", R.mipmap.ic_yellow_background, R.mipmap.ic_yellow_foreground, R.string.AppIconYellow),
-        COLOR("ColorIcon", R.mipmap.ic_color_background, R.mipmap.ic_color_foreground, R.string.AppIconColor),
-        VINTAGE("VintageIcon", R.drawable.icon_6_background_sa, R.mipmap.icon_6_foreground_sa, R.string.AppIconVintage),
-        AQUA("AquaIcon", R.drawable.icon_4_background_sa, R.mipmap.icon_foreground_sa, R.string.AppIconAqua),
-        PREMIUM("PremiumIcon", R.drawable.icon_3_background_sa, R.mipmap.icon_3_foreground_sa, R.string.AppIconPremium, true),
-        TURBO("TurboIcon", R.drawable.icon_5_background_sa, R.mipmap.icon_5_foreground_sa, R.string.AppIconTurbo, true),
-        NOX("NoxIcon", R.mipmap.icon_2_background_sa, R.mipmap.icon_foreground_sa, R.string.AppIconNox, true);
+        MDGRAM_DEFAULT("org.telegram.messenger.DefaultIcon", R.mipmap.mdgram_v21_default, R.mipmap.mdgram_v21_default, R.string.Default),
+        MDGRAM_MATERIAL("org.telegram.messenger.MDGramMaterialIcon", R.mipmap.mdgram_v21_material, R.mipmap.mdgram_v21_material, R.string.Default),
+        MDGRAM_ORANGE("org.telegram.messenger.MDGramOrangeIcon", R.mipmap.mdgram_v21_orange, R.mipmap.mdgram_v21_orange, R.string.Default),
+        MDGRAM_GREEN("org.telegram.messenger.MDGramGreenIcon", R.mipmap.mdgram_v21_green, R.mipmap.mdgram_v21_green, R.string.Default),
+        MDGRAM_YELLOW("org.telegram.messenger.MDGramYellowIcon", R.mipmap.mdgram_v21_yellow, R.mipmap.mdgram_v21_yellow, R.string.Default),
+        CHERRY("CG_Icon_Cherry", R.drawable.icon_background_default, R.drawable.mdgram_icon_3tone, R.string.Default),
+        DARK_CHERRY("CG_Icon_Dark", R.drawable.icon_background_dark, R.drawable.icon_foreground_cherry, R.string.AP_ChangeIcon_Dark),
+        DARK_CHERRY_BRA("CG_Icon_Dark_Bra", R.drawable.icon_background_dark, R.drawable.icon_foreground_cherry_bra, R.string.AP_ChangeIcon_Bra),
+        WHITE_CHERRY("CG_Icon_White_Cherry", R.drawable.icon_background_white, R.drawable.icon_foreground_cherry_white, R.string.AP_ChangeIcon_White),
+        WHITE_CHERRY_BRA("CG_Icon_White_Cherry_Bra", R.drawable.icon_background_white, R.drawable.icon_foreground_cherry_white_bra, R.string.AP_ChangeIcon_Bra),
+        LAGUNA_CHERRY("CG_Icon_Laguna", R.drawable.icon_background_laguna, R.drawable.icon_foreground_cherry, R.string.AP_ChangeIcon_Laguna),
+        AQUA_CHERRY("CG_Icon_Aqua", R.drawable.icon_background_aqua, R.drawable.icon_foreground_cherry, R.string.AppIconAqua),
+        GREEN_CHERRY("CG_Icon_Green", R.drawable.icon_background_green, R.drawable.icon_foreground_cherry, R.string.AP_ChangeIcon_Green),
+        LAVANDA_CHERRY("CG_Icon_Lavanda", R.drawable.icon_background_lavanda, R.drawable.icon_foreground_cherry, R.string.AP_ChangeIcon_Lavanda),
+        VIOLET_SUNSET_CHERRY("CG_Icon_Violet_Sunset", R.drawable.icon_background_violet_sunset, R.drawable.icon_foreground_cherry, R.string.AP_ChangeIcon_Violet_Sunset),
+        VIOLET_SUNSET_CHERRY_BRA("CG_Icon_Violet_Sunset_Bra", R.drawable.icon_background_violet_sunset, R.drawable.icon_foreground_cherry_bra, R.string.AP_ChangeIcon_Bra),
+        SUNSET_CHERRY("CG_Icon_Sunset", R.drawable.icon_background_sunset, R.drawable.icon_foreground_cherry, R.string.AP_ChangeIcon_Sunset),
+        SUNRISE_CHERRY("CG_Icon_Sunrise", R.drawable.icon_background_sunrise, R.drawable.icon_foreground_cherry, R.string.AP_ChangeIcon_Sunrise),
+        TURBO_CHERRY("CG_Icon_Turbo", R.drawable.icon_5_background_sa, R.drawable.icon_foreground_cherry, R.string.AppIconTurbo),
+        NOX_CHERRY("CG_Icon_Night", R.mipmap.icon_2_background_sa, R.drawable.icon_foreground_cherry, R.string.AppIconNox),
+        DARK_NY("CG_Icon_Dark_NY", R.drawable.icon_background_dark_ny, R.drawable.icon_foreground_cherry_bra, R.string.AP_ChangeIcon_Cherry_NY),
+
+        PREMIUM("PremiumIcon", R.drawable.icon_3_background_sa, R.mipmap.icon_3_foreground, R.string.AppIconPremium, true),
+        TURBO("TurboIcon", R.drawable.icon_5_background_sa, R.mipmap.icon_5_foreground, R.string.AppIconTurbo, true),
+        NOX("NoxIcon", R.mipmap.icon_2_background_sa, R.drawable.icon_foreground, R.string.AppIconNox, true);
 
         public final String key;
         public final int background;
@@ -57,7 +77,7 @@ public class LauncherIconController {
 
         public ComponentName getComponentName(Context ctx) {
             if (componentName == null) {
-                componentName = new ComponentName(ctx.getPackageName(), "org.telegram.messenger." + key);
+                componentName = new ComponentName(ctx.getPackageName(), key.contains(".") ? key : "uz.unnarsx.cherrygram." + key);
             }
             return componentName;
         }

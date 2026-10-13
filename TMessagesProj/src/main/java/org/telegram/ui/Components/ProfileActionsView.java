@@ -21,13 +21,19 @@ import android.graphics.RenderNode;
 import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.os.Bundle;
 import android.text.Layout;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityManager;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityNodeProvider;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.RawRes;
 import androidx.annotation.StringRes;
 import androidx.core.graphics.ColorUtils;
@@ -36,9 +42,9 @@ import androidx.core.math.MathUtils;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.BuildConfig;
 import org.telegram.messenger.R;
-import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Cells.ChatMessageCell;
 import org.telegram.ui.ProfileActivity;
 
 import java.util.ArrayList;
@@ -132,6 +138,8 @@ public class ProfileActionsView extends View {
         this.targetHeight = (int) (targetHeight - ypadding - top);
 
         setBackgroundColor(0);
+
+        setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
     }
 
     public void drawingBlur(boolean drawing) {
@@ -299,7 +307,7 @@ public class ProfileActionsView extends View {
                     int newAlpha = (int) (action.getAlpha() * alphaFraction1 * wasAlpha);
                     paint.setAlpha((int) (newAlpha * (radialGradient != null ? 0.1f : 1f)));
 
-                    if (SharedConfig.shadowsInSections && isButtonColorLight() && parentExpanded < 0.5f) {
+                    if (isButtonColorLight() && parentExpanded < 0.5f) {
                         paint.setShadowLayer(dpf2(1.5f), 0, 0, Theme.multAlpha(Color.BLACK & 0x20FFFFFF, (newAlpha / 255f * (radialGradient != null ? 0.1f : 1f))));
                     } else {
                         paint.setShadowLayer(0, 0, 0, 0);
@@ -494,7 +502,7 @@ public class ProfileActionsView extends View {
 
         if (action.loadingDrawable != null) {
             action.loadingDrawable.setBounds(action.rect);
-            action.loadingDrawable.setRadiiDp(8);
+            action.loadingDrawable.setRadii(getRoundRadius());
             action.loadingDrawable.setAlpha((int) (0xFF * alpha));
             action.loadingDrawable.draw(canvas);
         }
@@ -721,9 +729,10 @@ public class ProfileActionsView extends View {
                     insertIfAvailable(out, KEY_VOICE_CHAT);
                     insertIfNotAvailable(out, KEY_STREAM, KEY_VOICE_CHAT);
                 }
+                insertIfAvailable(out, KEY_DISCUSS);
                 insertIfAvailable(out, KEY_NOTIFICATION);
                 if (!join) {
-                    insertIfAvailable(out, KEY_DISCUSS);
+//                    insertIfAvailable(out, KEY_DISCUSS);
                     insertIfNotAvailable2(out, KEY_GIFT, KEY_DISCUSS, KEY_STORY);
                 }
                 insertIfNotAvailable(out, KEY_SHARE, KEY_STORY);
@@ -735,6 +744,7 @@ public class ProfileActionsView extends View {
                 }
                 break;
             case MODE_GROUP:
+                insertIfAvailable(out, KEY_OPEN_CHANNEL);
             case MODE_FORUM:
                 if (join) {
                     insertIfAvailable(out, KEY_JOIN);
@@ -747,6 +757,7 @@ public class ProfileActionsView extends View {
                 } else {
                     insertIfAvailable(out, KEY_VOICE_CHAT);
                     insertIfNotAvailable(out, KEY_STREAM, KEY_VOICE_CHAT);
+                    insertIfAvailable(out, KEY_STORY);
                     insertIfAvailable(out, KEY_LEAVE);
                 }
                 break;
@@ -883,6 +894,9 @@ public class ProfileActionsView extends View {
             case KEY_NOTIFICATION:
                 newAction = new Action();
                 updateNotification(newAction, false);
+                break;
+            case KEY_OPEN_CHANNEL:
+                newAction = new Action(ActionButton.OPEN_CHANNEL);
                 break;
         }
 
@@ -1078,6 +1092,8 @@ public class ProfileActionsView extends View {
                 to.left = to.right;
             } else if ((key == KEY_GIFT || key == KEY_DISCUSS) && mode == MODE_CHANNEL) {
                 to.left = to.right;
+            } else if (key == KEY_OPEN_CHANNEL && mode == MODE_GROUP) {
+                to.left = to.right;
             } else {
                 to.left = to.right = to.centerX();
             }
@@ -1138,6 +1154,9 @@ public class ProfileActionsView extends View {
                     fromLeft = true;
                     fromRight = false;
                 } else if (fromLeft && lastAction != null && !lastAction.isDeleting) {
+                    fromLeft = false;
+                    fromRight = true;
+                } else if (key == KEY_OPEN_CHANNEL && mode == MODE_GROUP) {
                     fromLeft = false;
                     fromRight = true;
                 }
@@ -1222,7 +1241,9 @@ public class ProfileActionsView extends View {
         SET_PHOTO(R.string.ProfileActionsEditPhoto2, R.drawable.filled_profile_photo, R.drawable.outline_profile_photo),
         EDIT_USERNAME(R.string.ProfileActionsEditUsername, R.drawable.filled_profile_edit_24, R.drawable.outline_profile_edit_24),
         EDIT_INFO(R.string.ProfileActionsEditInfo, R.drawable.filled_profile_edit_24, R.drawable.outline_profile_edit_24),
-        SETTINGS(R.string.Settings, R.drawable.filled_profile_settings, R.drawable.outline_profile_settings),;
+        SETTINGS(R.string.Settings, R.drawable.filled_profile_settings, R.drawable.outline_profile_settings),
+        OPEN_CHANNEL(R.string.ProfileChannel, R.drawable.msg_folders_channels, R.drawable.msg_folders_channels),
+        QR_BUTTON(R.string.QrCode, R.drawable.msg_qrcode, R.drawable.msg_qrcode);
 
         final @StringRes int title;
         final @DrawableRes int filledIcon;
@@ -1234,4 +1255,126 @@ public class ProfileActionsView extends View {
             this.outlineIcon = outlineIcon;
         }
     }
+
+    private AccessibilityNodeProvider accessibilityNodeProvider;
+    @Override
+    public AccessibilityNodeProvider getAccessibilityNodeProvider() {
+        if (accessibilityNodeProvider == null) {
+            accessibilityNodeProvider = new AccessibilityNodeProvider() {
+                @Override
+                public AccessibilityNodeInfo createAccessibilityNodeInfo(int virtualViewId) {
+                    int[] pos = {0, 0};
+                    getLocationOnScreen(pos);
+                    if (virtualViewId == HOST_VIEW_ID) {
+                        AccessibilityNodeInfo info = AccessibilityNodeInfo.obtain(ProfileActionsView.this);
+                        onInitializeAccessibilityNodeInfo(info);
+                        info.setEnabled(true);
+
+                        for (int i = 0; i < actions.size(); ++i) {
+                            info.addChild(ProfileActionsView.this, actions.get(i).key);
+                        }
+
+                        return info;
+                    } else {
+                        Action action = null;
+                        for (int i = 0; i < actions.size(); ++i) {
+                            if (actions.get(i).key == virtualViewId) {
+                                action = actions.get(i);
+                                break;
+                            }
+                        }
+                        if (action == null) return null;
+                        if (action.rect.isEmpty()) return null;
+
+                        AccessibilityNodeInfo info = AccessibilityNodeInfo.obtain();
+                        info.setSource(ProfileActionsView.this, virtualViewId);
+                        info.setParent(ProfileActionsView.this);
+                        info.setPackageName(getContext().getPackageName());
+
+                        info.addAction(AccessibilityNodeInfo.ACTION_CLICK);
+                        info.addAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS);
+                        info.setClickable(true);
+                        info.setFocusable(true);
+                        info.setEnabled(true);
+                        info.setVisibleToUser(true);
+                        info.setClassName(android.widget.Button.class.getName());
+
+                        info.setText(action.text.getText());
+
+                        Rect parentBounds = new Rect(
+                                (int) action.rect.left,
+                                (int) action.rect.top,
+                                (int) action.rect.right,
+                                (int) action.rect.bottom
+                        );
+                        info.setBoundsInParent(parentBounds);
+                        parentBounds.offset(pos[0], pos[1]);
+                        info.setBoundsInScreen(parentBounds);
+
+                        return info;
+                    }
+                }
+
+                @Override
+                public boolean performAction(int virtualViewId, int action, @Nullable Bundle arguments) {
+                    if (virtualViewId == HOST_VIEW_ID) {
+                        return performAccessibilityAction(action, arguments);
+                    }
+
+                    Action button = null;
+                    for (int i = 0; i < actions.size(); ++i) {
+                        if (actions.get(i).key == virtualViewId) {
+                            button = actions.get(i);
+                            break;
+                        }
+                    }
+                    if (button == null) return false;
+
+                    if (action == AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS) {
+                        sendAccessibilityEventForVirtualView(virtualViewId, AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED);
+                        return true;
+                    } else if (action == AccessibilityNodeInfo.ACTION_CLICK) {
+                        if (onActionClickListener != null) {
+                            onActionClickListener.onClick(virtualViewId, 0, 0);
+                        }
+                        return true;
+                    }
+
+                    return false;
+                }
+
+                private void sendAccessibilityEventForVirtualView(int viewId, int eventType) {
+                    sendAccessibilityEventForVirtualView(viewId, eventType, null);
+                }
+
+                private void sendAccessibilityEventForVirtualView(int viewId, int eventType, String text) {
+                    AccessibilityManager am = (AccessibilityManager) getContext().getSystemService(Context.ACCESSIBILITY_SERVICE);
+                    if (am.isTouchExplorationEnabled()) {
+                        AccessibilityEvent event = AccessibilityEvent.obtain(eventType);
+                        event.setPackageName(getContext().getPackageName());
+                        event.setSource(ProfileActionsView.this, viewId);
+                        if (text != null) {
+                            event.getText().add(text);
+                        }
+                        if (getParent() != null) {
+                            getParent().requestSendAccessibilityEvent(ProfileActionsView.this, event);
+                        }
+                    }
+                }
+            };
+        }
+        return accessibilityNodeProvider;
+    }
+
+    /** Cherrygram start */
+    public static final int KEY_OPEN_CHANNEL = 1390;
+    public static final int KEY_QR_BUTTON = 1391;
+
+    public void addQRButton() {
+        final Action action = new Action(ActionButton.QR_BUTTON);
+        action.key = KEY_QR_BUTTON;
+        actions.add(action);
+    }
+    /** Cherrygram finish */
+
 }

@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
+import android.os.Bundle;
 import android.util.SparseIntArray;
 import android.view.Menu;
 import android.view.View;
@@ -14,16 +15,26 @@ import android.widget.FrameLayout;
 
 import androidx.core.util.Supplier;
 
+import org.telegram.messenger.FileLog;
+import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.BackButtonMenu;
+import org.telegram.ui.DialogsActivity;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import uz.unnarsx.cherrygram.core.configs.CherrygramCoreConfig;
+import uz.unnarsx.cherrygram.core.CGBiometricPrompt;
+import uz.unnarsx.cherrygram.core.configs.CherrygramPrivacyConfig;
 
 public interface INavigationLayout {
     int REBUILD_FLAG_REBUILD_LAST = 1, REBUILD_FLAG_REBUILD_ONLY_LAST = 2;
 
     int FORCE_NOT_ATTACH_VIEW = -2;
     int FORCE_ATTACH_VIEW_AS_FIRST = -3;
+
+    boolean isLayersLayout();
+    boolean isRightLayout();
 
     boolean presentFragment(NavigationParams params);
     boolean checkTransitionAnimation();
@@ -73,8 +84,8 @@ public interface INavigationLayout {
     void startActivityForResult(Intent intent, int requestCode);
 
     // TODO: Migrate them to be out of navigation layout
-    Theme.MessageDrawable getMessageDrawableOutStart();
-    Theme.MessageDrawable getMessageDrawableOutMediaStart();
+    MessageDrawable getMessageDrawableOutStart();
+    MessageDrawable getMessageDrawableOutMediaStart();
 
     // TODO: Make something like FieldsContainer and put them there?
     List<BackButtonMenu.PulledDialog> getPulledDialogs();
@@ -244,6 +255,48 @@ public interface INavigationLayout {
     }
 
     default boolean presentFragment(BaseFragment fragment) {
+        if (fragment instanceof ChatActivity && (CherrygramPrivacyConfig.INSTANCE.getAskBiometricsToOpenChat() || CherrygramPrivacyConfig.INSTANCE.getAskBiometricsToOpenEncrypted())) {
+            if (CherrygramCoreConfig.isDevBuild()) FileLog.d("fragment is chat activity");
+
+            Bundle args = fragment.getArguments();
+            if (args == null) {
+                return false;
+            }
+
+            long userID = args.getLong("user_id");
+            long chatID = args.getLong("chat_id");
+            int encID = args.getInt("enc_id");
+//        boolean encrypted = fragment.arguments.containsKey("enc_id");
+
+            if (getParentActivity() != null && fragment.getChatsPasswordHelper().shouldRequireBiometrics(userID, chatID, encID)) {
+                CGBiometricPrompt.prompt(getParentActivity(),
+                        () -> presentFragment(new NavigationParams(fragment))
+                );
+                return true;
+            }
+
+            return presentFragment(new NavigationParams(fragment));
+        }
+
+        if (fragment instanceof DialogsActivity && CherrygramPrivacyConfig.INSTANCE.getAskBiometricsToOpenArchive()) {
+            if (CherrygramCoreConfig.isDevBuild()) FileLog.d("fragment is dialogs activity");
+
+            Bundle args = fragment.getArguments();
+            if (args == null) {
+                return presentFragment(new NavigationParams(fragment));
+            }
+
+            int folderId = args.getInt("folderId");
+
+            if (getParentActivity() != null && folderId == 1) {
+                CGBiometricPrompt.prompt(getParentActivity(),
+                        () -> presentFragment(new NavigationParams(fragment))
+                );
+                return true;
+            }
+
+            return presentFragment(new NavigationParams(fragment));
+        }
         return presentFragment(new NavigationParams(fragment));
     }
 
@@ -264,6 +317,45 @@ public interface INavigationLayout {
      */
     @Deprecated
     default boolean presentFragment(BaseFragment fragment, boolean removeLast, boolean forceWithoutAnimation, boolean check, boolean preview) {
+        if (!(fragment instanceof ChatActivity) || check) {
+            return presentFragment(new NavigationParams(fragment).setRemoveLast(removeLast).setNoAnimation(forceWithoutAnimation).setCheckPresentFromDelegate(check).setPreview(preview));
+        }
+
+        if (!(CherrygramPrivacyConfig.INSTANCE.getAskBiometricsToOpenChat() || CherrygramPrivacyConfig.INSTANCE.getAskBiometricsToOpenEncrypted())) {
+            return presentFragment(
+                    new NavigationParams(fragment)
+                            .setRemoveLast(removeLast)
+                            .setNoAnimation(forceWithoutAnimation)
+                            .setCheckPresentFromDelegate(check)
+                            .setPreview(preview)
+            );
+        }
+
+        if (CherrygramCoreConfig.isDevBuild()) FileLog.d("fragment is ChatActivity");
+
+        Bundle args = fragment.getArguments();
+        if (args == null) {
+            return false;
+        }
+
+        long userID = args.getLong("user_id");
+        long chatID = args.getLong("chat_id");
+        int encID = args.getInt("enc_id");
+//        boolean encrypted = fragment.arguments.containsKey("enc_id");
+
+        if (getParentActivity() != null && fragment.getChatsPasswordHelper().shouldRequireBiometrics(userID, chatID, encID)) {
+            CGBiometricPrompt.prompt(getParentActivity(), () ->
+                    presentFragment(
+                            new NavigationParams(fragment)
+                                    .setRemoveLast(removeLast)
+                                    .setNoAnimation(forceWithoutAnimation)
+                                    .setCheckPresentFromDelegate(check)
+                                    .setPreview(preview)
+                    )
+            );
+
+            return true;
+        }
         return presentFragment(new NavigationParams(fragment).setRemoveLast(removeLast).setNoAnimation(forceWithoutAnimation).setCheckPresentFromDelegate(check).setPreview(preview));
     }
 
@@ -272,6 +364,48 @@ public interface INavigationLayout {
      */
     @Deprecated
     default boolean presentFragment(BaseFragment fragment, boolean removeLast, boolean forceWithoutAnimation, boolean check, boolean preview, ActionBarPopupWindow.ActionBarPopupWindowLayout menuView) {
+        if (!(fragment instanceof ChatActivity)) {
+            return presentFragment(new NavigationParams(fragment).setRemoveLast(removeLast).setNoAnimation(forceWithoutAnimation).setCheckPresentFromDelegate(check).setPreview(preview).setMenuView(menuView));
+        }
+
+        if (!(CherrygramPrivacyConfig.INSTANCE.getAskBiometricsToOpenChat() || CherrygramPrivacyConfig.INSTANCE.getAskBiometricsToOpenEncrypted())) {
+            return presentFragment(
+                    new NavigationParams(fragment)
+                            .setRemoveLast(removeLast)
+                            .setNoAnimation(forceWithoutAnimation)
+                            .setCheckPresentFromDelegate(check)
+                            .setPreview(preview)
+                            .setMenuView(menuView)
+            );
+        }
+
+        if (CherrygramCoreConfig.isDevBuild()) {
+            if (CherrygramCoreConfig.isDevBuild()) FileLog.d("fragment is chat activity");
+        }
+
+        Bundle args = fragment.getArguments();
+        if (args == null) {
+            return false;
+        }
+
+        long userID = args.getLong("user_id");
+        long chatID = args.getLong("chat_id");
+        int encID = args.getInt("enc_id");
+//        boolean encrypted = fragment.arguments.containsKey("enc_id");
+
+        if (getParentActivity() != null && fragment.getChatsPasswordHelper().shouldRequireBiometrics(userID, chatID, encID)) {
+            CGBiometricPrompt.prompt(getParentActivity(), () ->
+                    presentFragment(
+                            new NavigationParams(fragment)
+                                    .setRemoveLast(removeLast)
+                                    .setNoAnimation(forceWithoutAnimation)
+                                    .setCheckPresentFromDelegate(check)
+                                    .setPreview(preview)
+                                    .setMenuView(menuView)
+                    )
+            );
+            return true;
+        }
         return presentFragment(new NavigationParams(fragment).setRemoveLast(removeLast).setNoAnimation(forceWithoutAnimation).setCheckPresentFromDelegate(check).setPreview(preview).setMenuView(menuView));
     }
 
@@ -339,12 +473,18 @@ public interface INavigationLayout {
         public boolean preview;
         public ActionBarPopupWindow.ActionBarPopupWindowLayout menuView;
         public boolean needDelayWithoutAnimation;
+        public boolean forceRightLayout;
 
         public boolean isFromDelay;
         public boolean delayDone;
 
         public NavigationParams(BaseFragment fragment) {
             this.fragment = fragment;
+        }
+
+        public NavigationParams forceRightLayout() {
+            forceRightLayout = true;
+            return this;
         }
 
         public NavigationParams setRemoveLast(boolean removeLast) {

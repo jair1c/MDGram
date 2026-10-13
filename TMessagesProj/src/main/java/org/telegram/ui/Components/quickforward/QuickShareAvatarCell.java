@@ -297,6 +297,7 @@ class QuickShareAvatarCell implements ValueAnimator.AnimatorUpdateListener {
             avatarDrawable.setInfo(currentAccount, user);
             if (UserObject.isUserSelf(user)) {
                 displayName = LocaleController.getString(R.string.SavedMessages);
+                avatarDrawable.setIgnorePaintAlpha(true);
                 avatarDrawable.setAvatarType(AvatarDrawable.AVATAR_TYPE_SAVED);
                 avatarDrawable.setScaleSize(0.75f);
                 imageReceiver.setImage(null, null, null, null, avatarDrawable, 0, null, user, 0);

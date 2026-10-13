@@ -43,6 +43,8 @@ import org.telegram.ui.SelectAnimatedEmojiDialog;
 import java.util.ArrayList;
 import java.util.Random;
 
+import uz.unnarsx.cherrygram.core.configs.CherrygramMessagesConfig;
+
 public class ReactionsEffectOverlay {
 
     public final static int LONG_ANIMATION = 0;
@@ -751,6 +753,7 @@ public class ReactionsEffectOverlay {
     }
 
     public static void show(BaseFragment baseFragment, ReactionsContainerLayout reactionsLayout, View cell, View fromAnimationView, float x, float y, ReactionsLayoutInBubble.VisibleReaction visibleReaction, int currentAccount, int animationType) {
+        if (CherrygramMessagesConfig.INSTANCE.getDisableReactionAnim()) return;
         if (cell == null || visibleReaction == null || baseFragment == null || baseFragment.getParentActivity() == null) {
             return;
         }
@@ -800,6 +803,7 @@ public class ReactionsEffectOverlay {
     }
 
     public static void startAnimation() {
+        if (CherrygramMessagesConfig.INSTANCE.getDisableReactionAnim()) return;
         if (currentOverlay != null) {
             currentOverlay.started = true;
             currentOverlay.startTime = System.currentTimeMillis();

@@ -65,6 +65,127 @@ public class MDGramSideDrawer extends FrameLayout {
 
     private boolean open;
     private AnimatorSet animator;
+    private boolean modalStyle;
+    private final java.util.ArrayList<TextView> modalTexts = new java.util.ArrayList<>();
+    private ImageView modalMoon, modalDismiss;
+    private TextView modalUsername, modalManage;
+
+    private GradientDrawable accountPillBackground() {
+        int surface = Theme.getColor(Theme.key_windowBackgroundWhite);
+        int text = Theme.getColor(Theme.key_windowBackgroundWhiteBlackText);
+        GradientDrawable background = new GradientDrawable();
+        background.setCornerRadius(dp(24));
+        background.setColor(Theme.isCurrentThemeDark() ? androidx.core.graphics.ColorUtils.blendARGB(surface, text, 0.10f) : surface);
+        background.setStroke(dp(1), Theme.isCurrentThemeDark() ? androidx.core.graphics.ColorUtils.blendARGB(surface, text, 0.35f) : Theme.getColor(Theme.key_divider));
+        return background;
+    }
+
+    private TextView modalText(String text, int size) {
+        TextView view = new TextView(activity);
+        view.setText(text);
+        view.setTextSize(size);
+        view.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        view.setTypeface(AndroidUtilities.bold());
+        modalTexts.add(view);
+        return view;
+    }
+
+    private void buildModalContent() {
+        modalTexts.clear();
+        panel.removeAllViews();
+        itemIcons.clear();
+        itemTexts.clear();
+        panel.setTranslationX(0);
+        panel.setBackground(Theme.createRoundRectDrawable(dp(30), Theme.getColor(Theme.key_windowBackgroundWhite)));
+        int width = Math.min(dp(420), AndroidUtilities.displaySize.x - dp(40));
+        panel.setLayoutParams(new FrameLayout.LayoutParams(width, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
+        ScrollView scroll = new ScrollView(activity) {
+            @Override protected void onMeasure(int widthSpec, int heightSpec) {
+                super.onMeasure(widthSpec, MeasureSpec.makeMeasureSpec(AndroidUtilities.displaySize.y - dp(100), MeasureSpec.AT_MOST));
+            }
+        };
+        scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(16), dp(16), dp(18));
+        FrameLayout heading = new FrameLayout(activity);
+        TextView title = modalText("MDGram", 22);
+        title.setGravity(Gravity.CENTER);
+        heading.addView(title, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48));
+        ImageView dismiss = new ImageView(activity);
+        modalDismiss = dismiss;
+        dismiss.setImageResource(R.drawable.ic_close_white);
+        dismiss.setColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        dismiss.setScaleType(ImageView.ScaleType.CENTER);
+        dismiss.setContentDescription("Cerrar menú");
+        dismiss.setOnClickListener(v -> close());
+        heading.addView(dismiss, LayoutHelper.createFrame(48, 48, Gravity.LEFT));
+        ImageView moon = new ImageView(activity);
+        modalMoon = moon;
+        moon.setImageResource(Theme.isCurrentThemeDark() ? R.drawable.menu_day_mode_24 : R.drawable.menu_night_mode_24);
+        moon.setScaleType(ImageView.ScaleType.CENTER);
+        moon.setColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        moon.setContentDescription("Cambiar tema claro u oscuro");
+        moon.setOnClickListener(v -> {
+            boolean dark = !Theme.isCurrentThemeDark();
+            Theme.ThemeInfo theme = Theme.getTheme(dark ? "Dark Blue" : "Day");
+            AndroidUtilities.runOnUIThread(() -> NotificationCenter.getGlobalInstance().postNotificationName(
+                    NotificationCenter.needSetDayNightTheme, theme, false,
+                    null, -1, dark, null, null, null, true));
+        });
+        heading.addView(moon, LayoutHelper.createFrame(48, 48, Gravity.RIGHT));
+        content.addView(heading);
+        TLRPC.User user = UserConfig.getInstance(UserConfig.selectedAccount).getCurrentUser();
+        LinearLayout identity = new LinearLayout(activity);
+        identity.setGravity(Gravity.CENTER_VERTICAL);
+        identity.setPadding(dp(16), 0, dp(16), 0);
+        BackupImageView avatar = new BackupImageView(activity);
+        avatar.setRoundRadius(dp(28));
+        avatar.setForUserOrChat(user, new AvatarDrawable(user));
+        identity.addView(avatar, LayoutHelper.createLinear(56, 56, Gravity.CENTER_VERTICAL, 0, 0, 16, 0));
+        LinearLayout labels = new LinearLayout(activity);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        TextView name = modalText(UserObject.getUserName(user), 18);
+        name.setSingleLine(true);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        labels.addView(name);
+        TextView username = modalText(user != null && user.username != null && !user.username.isEmpty() ? "@" + user.username : "Mi cuenta", 15);
+        modalUsername = username;
+        username.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+        labels.addView(username);
+        identity.addView(labels, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
+        content.addView(identity, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 88));
+        TextView manage = modalText("Gestionar tu cuenta", 16);
+        modalManage = manage;
+        manage.setGravity(Gravity.CENTER);
+        manage.setBackground(accountPillBackground());
+        manage.setElevation(dp(2));
+        manage.setOnClickListener(v -> {
+            close();
+            AndroidUtilities.runOnUIThread(() -> present(new SettingsActivity(new android.os.Bundle())), 220);
+        });
+        content.addView(manage, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44, 16, 0, 16, 24));
+        addItem(content, R.drawable.msg_groups, "Nuevo grupo", this::newGroup);
+        addItem(content, R.drawable.msg_channel, "Nuevo canal", this::newChannel);
+        addItem(content, R.drawable.msg2_devices, "Dispositivos vinculados", () -> present(new org.telegram.ui.SessionsActivity(0)));
+        addItem(content, R.drawable.msg_calls, "Llamadas recientes", () -> present(new CallLogActivity()));
+        addItem(content, R.drawable.msg_contacts, "Contactos", () -> present(new ContactsActivity(new android.os.Bundle())));
+        View gap = new View(activity);
+        content.addView(gap, LayoutHelper.createLinear(1, 16));
+        addItem(content, R.drawable.msg_settings, "Ajustes de MDGram", () -> present(new org.telegram.ui.MDGramSettingsActivity()));
+        addItem(content, R.drawable.msg2_help, "Ayuda y comentarios", () -> org.telegram.messenger.browser.Browser.openUrl(activity, "https://telegram.org/faq"));
+        LinearLayout footer = new LinearLayout(activity);
+        footer.setGravity(Gravity.CENTER);
+        TextView privacy = modalText("Privacidad", 12);
+        TextView terms = modalText("  ·  Condiciones de servicio", 12);
+        privacy.setOnClickListener(v -> org.telegram.messenger.browser.Browser.openUrl(activity, "https://telegram.org/privacy"));
+        terms.setOnClickListener(v -> org.telegram.messenger.browser.Browser.openUrl(activity, "https://telegram.org/tos"));
+        footer.addView(privacy);
+        footer.addView(terms);
+        content.addView(footer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44));
+        scroll.addView(content);
+        panel.addView(scroll);
+    }
 
     public MDGramSideDrawer(LaunchActivity activity) {
         super(activity);
@@ -154,6 +275,7 @@ public class MDGramSideDrawer extends FrameLayout {
         addItem(content, R.drawable.msg_location, "Personas cerca", () -> soon("Personas cerca"));
         addItem(content, R.drawable.msg_archive, "Chats archivados", this::openArchived);
         addItem(content, R.drawable.msg_saved, "Mensajes guardados", this::openSaved);
+        addItem(content, R.drawable.md_sett_general, "Ajustes de MDGram", () -> present(new org.telegram.ui.MDGramSettingsActivity()));
         addItem(content, R.drawable.msg_settings, "Ajustes", () -> present(new SettingsActivity(new android.os.Bundle())));
 
         ScrollView scroll = new ScrollView(activity);
@@ -258,9 +380,22 @@ public class MDGramSideDrawer extends FrameLayout {
     }
 
     // refresca los colores del panel según el tema activo (para que tras un toggle se vea correcto)
-    private void updateColors() {
+    public void updateColors() {
         if (panel != null) {
-            panel.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+            if (modalStyle) {
+                panel.setBackground(Theme.createRoundRectDrawable(dp(30), Theme.getColor(Theme.key_windowBackgroundWhite)));
+            } else {
+                panel.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+            }
+        }
+        if (modalStyle) {
+            int color = Theme.getColor(Theme.key_windowBackgroundWhiteBlackText);
+            for (TextView text : modalTexts) text.setTextColor(color);
+            modalUsername.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+            modalDismiss.setColorFilter(color);
+            modalMoon.setColorFilter(color);
+            modalMoon.setImageResource(Theme.isCurrentThemeDark() ? R.drawable.menu_day_mode_24 : R.drawable.menu_night_mode_24);
+            modalManage.setBackground(accountPillBackground());
         }
         int iconColor = Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon);
         for (ImageView iv : itemIcons) {
@@ -269,6 +404,7 @@ public class MDGramSideDrawer extends FrameLayout {
         int textColor = Theme.getColor(Theme.key_windowBackgroundWhiteBlackText);
         for (TextView tv : itemTexts) {
             tv.setTextColor(textColor);
+            ((View) tv.getParent()).setBackground(Theme.getSelectorDrawable(false));
         }
         if (divider != null) {
             divider.setBackgroundColor(Theme.getColor(Theme.key_divider));
@@ -384,8 +520,21 @@ public class MDGramSideDrawer extends FrameLayout {
             return;
         }
         open = true;
-        updateHeader();
-        updateColors();
+        modalStyle = org.telegram.messenger.MDGramConfig.useNewNavigation();
+        if (modalStyle) {
+            buildModalContent();
+            panel.setAlpha(0);
+        } else {
+            panel.removeAllViews();
+            itemIcons.clear();
+            itemTexts.clear();
+            panel.setAlpha(1);
+            panel.setTranslationX(-panelWidth);
+            panel.setLayoutParams(new FrameLayout.LayoutParams(panelWidth, LayoutHelper.MATCH_PARENT, Gravity.LEFT | Gravity.TOP));
+            buildContent();
+            updateHeader();
+            updateColors();
+        }
         setVisibility(VISIBLE);
         bringToFront();
         if (animator != null) {
@@ -393,7 +542,7 @@ public class MDGramSideDrawer extends FrameLayout {
         }
         animator = new AnimatorSet();
         animator.playTogether(
-            ObjectAnimator.ofFloat(panel, View.TRANSLATION_X, panel.getTranslationX(), 0),
+            ObjectAnimator.ofFloat(panel, modalStyle ? View.ALPHA : View.TRANSLATION_X, modalStyle ? panel.getAlpha() : panel.getTranslationX(), modalStyle ? 1 : 0),
             ObjectAnimator.ofFloat(scrim, View.ALPHA, scrim.getAlpha(), 1f)
         );
         animator.setDuration(260);
@@ -411,7 +560,7 @@ public class MDGramSideDrawer extends FrameLayout {
         }
         animator = new AnimatorSet();
         animator.playTogether(
-            ObjectAnimator.ofFloat(panel, View.TRANSLATION_X, panel.getTranslationX(), -panelWidth),
+            ObjectAnimator.ofFloat(panel, modalStyle ? View.ALPHA : View.TRANSLATION_X, modalStyle ? panel.getAlpha() : panel.getTranslationX(), modalStyle ? 0 : -panelWidth),
             ObjectAnimator.ofFloat(scrim, View.ALPHA, scrim.getAlpha(), 0f)
         );
         animator.setDuration(220);
