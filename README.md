@@ -6,18 +6,18 @@ Cliente de Telegram no oficial para Android — revival del proyecto **MDGram** 
 
 Última versión en **[Releases](https://github.com/jair1c/MDGram/releases)**. Sitio oficial: **https://mdgram-web.vercel.app/**
 
-- **Universal** — funciona en todos los Android (elígela si no sabes tu arquitectura).
-- **Arm64 / Armv7a** — descargas más livianas según tu dispositivo.
+- **V5.1 Universal ARM32/ARM64** — Android 7 o posterior. Elige esta descarga para V5.1; esta release no ofrece APK separados por arquitectura.
+- Las descargas separadas Arm64 / Armv7a corresponden a versiones anteriores.
 
 Instala el APK permitiendo "instalar apps de esta fuente".
 
 ## Aviso para MDGram V5.1
 
-**V5.1 está en preparación y todavía no se ha publicado.** La última descarga disponible sigue siendo V5.
+**V5.1 estable ya está publicada, sin etiqueta beta.** [Descargar APK firmado](https://github.com/jair1c/MDGram/releases/download/V5.1/MDGram-universal.apk) · [Notas de la versión](RELEASE_NOTES_V5.1.md).
 
-A partir de V5.1, el identificador de paquete cambiará de `com.mdgram.messenger.web` a `com.mdgram.messenger`. Android lo tratará como una aplicación distinta: V5 y anteriores no se actualizarán automáticamente a V5.1 y podrán coexistir con ella. Cuando V5.1 esté disponible, instala su APK, inicia sesión de nuevo y comprueba que todo esté bien antes de eliminar la aplicación anterior. La sesión y los datos guardados solo en el dispositivo no se transfieren automáticamente.
+V5.1 cambia el paquete de `com.mdgram.messenger.web` a `com.mdgram.messenger`. Android la instala como una aplicación distinta. V5 y anteriores pueden coexistir; instala V5.1, inicia sesión y verifica tus chats antes de eliminar la anterior. La sesión y los datos locales no se transfieren automáticamente; no se promete migración de chats secretos.
 
-Este cambio se indicará también en las notas de la release V5.1.
+Se comprobaron navegación, traducción, grupos/canales, recepción de mensajes y notificaciones y estabilidad en Galaxy A36. No se realizaron llamadas ni pruebas Premium; consulta el alcance en [RELEASE_VERIFICATION_2026-10-13.md](RELEASE_VERIFICATION_2026-10-13.md).
 
 ## Licencia
 
@@ -34,12 +34,14 @@ MDGram deriva y toma código o funciones de estos proyectos de código abierto (
 - **OctoGram** — referencia de mods y traductor.
 - **MDGram original** de Richar Correa — inspiración y diseño de referencia.
 
-## Compilar
+## Código y compilación de V5.1
 
-Este repositorio **no incluye** los archivos `google-services.json` (config de Firebase). Coloca el tuyo en cada módulo que lo requiera antes de compilar. Luego:
+El código correspondiente al APK está en [codex/release-v5.1](https://github.com/jair1c/MDGram/tree/2b19922018f829c8138d68d4070b0492cf4e055d), basado en Telegram 12.10.1 / Cherrygram. Usa esa revisión para compilar V5.1; el árbol de main conserva la base anterior.
+
+Configura tu propio api_id y api_hash en Extra.kt (el código público contiene marcadores), tus archivos Firebase y tu keystore.properties local. No publiques credenciales ni claves de firma. Compila con JDK 21 y ejecuta:
 
 ```
-./gradlew :TMessagesProj_AppStandalone:assembleAfatStandalone -PabiSplits
+./gradlew :TMessagesProj_AppStandalone:assembleAfatStandalone
 ```
 
-Genera los APK firmados (universal + por ABI) en `TMessagesProj_AppStandalone/build/outputs/apk/afat/standalone/`.
+La configuración del proyecto genera bytecode Java/Kotlin 17. El APK oficial es ARM32/ARM64, Android 7 o posterior.
