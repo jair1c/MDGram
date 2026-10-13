@@ -25,3 +25,5 @@ APK ARM de 32 y 64 bits, Android 7 o posterior. El número de base mostrado por 
 ## Publicación
 
 Disponible en https://github.com/jair1c/MDGram/releases/tag/V5.1 como versión estable, sin prerelease. APK firmado universal ARM32/ARM64, junto con SHA256SUMS.txt. Código correspondiente en codex/release-v5.1. La migración de paquete requiere instalar la aplicación nueva e iniciar sesión.
+
+Los assets MDGram-arm64.apk y MDGram-armv7a.apk son copias de compatibilidad del mismo APK universal, para los enlaces existentes de la web. No son variantes reducidas; contienen ambas arquitecturas y comparten el SHA-256 del universal.
