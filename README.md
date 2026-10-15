@@ -6,10 +6,18 @@ Cliente de Telegram no oficial para Android — revival del proyecto **MDGram** 
 
 Última versión en **[Releases](https://github.com/jair1c/MDGram/releases)**. Sitio oficial: **https://mdgram-web.vercel.app/**
 
-- **V5.1 Universal ARM32/ARM64** — Android 7 o posterior. Elige esta descarga para V5.1; esta release no ofrece APK separados por arquitectura.
-- Las descargas separadas Arm64 / Armv7a corresponden a versiones anteriores.
+- **V5.2 Universal ARM32/ARM64** — Android 7 o posterior. Incluye Liquid Glass opcional; no se ofrecen APK reducidos por arquitectura.
+- Arm64 y Armv7a son copias de compatibilidad del mismo APK universal ARM32/ARM64.
 
 Instala el APK permitiendo "instalar apps de esta fuente".
+
+## MDGram V5.2 — Liquid Glass opcional
+
+[Descargar APK firmado](https://github.com/jair1c/MDGram/releases/download/V5.2/MDGram-universal.apk) · [Notas de V5.2](RELEASE_NOTES_V5.2.md) · [Validación](LIQUID_GLASS_VALIDATION.md).
+
+Liquid Glass se activa en Ajustes de MDGram → Pantalla principal. Está desactivado por defecto y es independiente del estilo plano o píldora. Desenfoque moderno desde Android 12 y refracción desde Android 13. Requiere más recursos de dibujo que el modo normal.
+
+V5.2 actualiza V5.1 conservando paquete y firma. Para V5 y anteriores sigue aplicando el aviso de migración de paquete de abajo. Se revisaron los cambios en Galaxy A36; no se promete un ensayo prolongado de batería ni todos los dispositivos.
 
 ## Aviso para MDGram V5.1
 
@@ -34,9 +42,9 @@ MDGram deriva y toma código o funciones de estos proyectos de código abierto (
 - **OctoGram** — referencia de mods y traductor.
 - **MDGram original** de Richar Correa — inspiración y diseño de referencia.
 
-## Código y compilación de V5.1
+## Código y compilación de V5.2
 
-El código correspondiente al APK está en [codex/release-v5.1](https://github.com/jair1c/MDGram/tree/2b19922018f829c8138d68d4070b0492cf4e055d), basado en Telegram 12.10.1 / Cherrygram. Usa esa revisión para compilar V5.1; el árbol de main conserva la base anterior.
+El código correspondiente al APK está en [codex/release-v5.2](https://github.com/jair1c/MDGram/tree/3b40a1ea0859dccae5a176d49e0f49895db4e967), basado en Telegram 12.10.1 / Cherrygram. Usa esa revisión para compilar V5.2; el árbol de main conserva la base anterior.
 
 Configura tu propio api_id y api_hash en Extra.kt (el código público contiene marcadores), tus archivos Firebase y tu keystore.properties local. No publiques credenciales ni claves de firma. Compila con JDK 21 y ejecuta:
 
