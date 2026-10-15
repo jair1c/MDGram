@@ -9081,7 +9081,7 @@ public class Theme {
 
     public static int getColor(int key, ResourcesProvider provider) {
         if (provider != null) {
-            return provider.getColor(key);
+            return mdgramNightAccent(key, provider.getColor(key), provider.isDark());
         }
         return getColor(key);
     }
@@ -9098,7 +9098,32 @@ public class Theme {
         return getColor(key, isDefault, false);
     }
 
+    private static int mdgramNightAccent(int key, int color, boolean dark) {
+        // Keep imported themes and deliberately chosen non-blue accents intact.
+        if (!dark || currentTheme == null || currentTheme.assetName == null) return color;
+        if (key != key_switchTrackChecked && key != key_windowBackgroundWhiteValueText
+                && key != key_windowBackgroundWhiteBlueText && key != key_windowBackgroundWhiteBlueText2
+                && key != key_windowBackgroundWhiteBlueText3 && key != key_windowBackgroundWhiteBlueText4
+                && key != key_windowBackgroundWhiteBlueText5 && key != key_windowBackgroundWhiteBlueText6
+                && key != key_windowBackgroundWhiteBlueText7 && key != key_windowBackgroundWhiteBlueHeader
+                && key != key_glass_tabSelected && key != key_glass_tabSelectedText
+                && key != key_chats_unreadCounter && key != key_topics_unreadCounter
+                && key != key_telegram_color_text
+                && key != key_chats_actionMessage && key != key_chats_nameMessage
+                && key != key_chats_nameMessage_threeLines && key != key_chats_sentReadCheck
+                && key != key_dialogTextBlue && key != key_dialogTextBlue2
+                && key != key_radioBackgroundChecked) return color;
+        float[] hsv = new float[3];
+        Color.colorToHSV(color, hsv);
+        if (hsv[1] < 0.25f || hsv[0] >= 185 && hsv[0] <= 260) return 0xFF42B5FF;
+        return color;
+    }
+
     public static int getColor(int key, boolean[] isDefault, boolean ignoreAnimation) {
+        return mdgramNightAccent(key, getBaseColor(key, isDefault, ignoreAnimation), isCurrentThemeDark());
+    }
+
+    private static int getBaseColor(int key, boolean[] isDefault, boolean ignoreAnimation) {
         if (!ignoreAnimation && animatingColors != null) {
             int index = animatingColors.indexOfKey(key);
             if (index >= 0) {

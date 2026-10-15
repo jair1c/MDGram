@@ -72,6 +72,7 @@ public class TranslateSettingsActivity extends BaseFragment {
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(content, new FrameLayout.LayoutParams(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        org.telegram.ui.Components.MDGramAppearance.settingsPage(root, content, getResourceProvider());
 
         HeaderCell header = new HeaderCell(context);
         header.setText("Traducir mensajes");
@@ -80,6 +81,7 @@ public class TranslateSettingsActivity extends BaseFragment {
         LinearLayout group = new LinearLayout(context);
         group.setOrientation(LinearLayout.VERTICAL);
         group.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        org.telegram.ui.Components.MDGramAppearance.settingsGroup(group, getResourceProvider());
         content.addView(group);
 
         // Mostrar botón "Traducir" (FUNCIONAL → pref translate_button de Telegram)

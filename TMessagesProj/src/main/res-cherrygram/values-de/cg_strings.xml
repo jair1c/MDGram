@@ -68,7 +68,7 @@
     <string name="CG_PushService">Cherrygram Push-Service.</string>
     <string name="CG_Kaboom">Auf diese Funktion kann über die Systemeinstellungen ohne das Cherrygram-Passwort zugegriffen werden. Diese Funktion löscht alle Ihre lokalen (Cherrygram-)Daten vollständig. Es kann in Notsituationen eingesetzt werden.</string>
     <string name="CG_AppCrashed">Es ist ein Fehler aufgetreten</string>
-    <string name="CG_AppCrashedDesc">Cherrygram ist abgestürzt. Bitte senden Sie Protokolle an die Entwickler, damit sie das Problem beheben können..</string>
+    <string name="CG_AppCrashedDesc">MDGram ist abgestürzt. Bitte senden Sie Protokolle an die Entwickler, damit sie das Problem beheben können..</string>
     <string name="CG_CopyReportDetails">Berichtsdetails kopieren</string>
     <string name="CG_ReportDetailsCopied">Berichtsdetails wurden in die Zwischenablage kopiert.</string>
     <string name="CG_TranslationLanguage">Übersetzungssprache</string>

@@ -79,6 +79,7 @@ public class GeneralSettingsActivity extends BaseFragment {
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(content, new FrameLayout.LayoutParams(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        org.telegram.ui.Components.MDGramAppearance.settingsPage(root, content, getResourceProvider());
 
         // ---- App Icono Launcher (selector de íconos alternativos) ----
         HeaderCell iconHeader = new HeaderCell(context);
@@ -92,6 +93,7 @@ public class GeneralSettingsActivity extends BaseFragment {
         LinearLayout profileGroup = new LinearLayout(context);
         profileGroup.setOrientation(LinearLayout.VERTICAL);
         profileGroup.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        org.telegram.ui.Components.MDGramAppearance.settingsGroup(profileGroup, getResourceProvider());
         content.addView(profileGroup);
 
         // Foto de perfil como fondo (FUNCIONAL)
@@ -135,6 +137,7 @@ public class GeneralSettingsActivity extends BaseFragment {
         LinearLayout fontsGroup = new LinearLayout(context);
         fontsGroup.setOrientation(LinearLayout.VERTICAL);
         fontsGroup.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        org.telegram.ui.Components.MDGramAppearance.settingsGroup(fontsGroup, getResourceProvider());
         content.addView(fontsGroup);
 
         // Estilos de fuentes (FUNCIONAL → selector de fuentes)
@@ -159,6 +162,7 @@ public class GeneralSettingsActivity extends BaseFragment {
         LinearLayout boostGroup = new LinearLayout(context);
         boostGroup.setOrientation(LinearLayout.VERTICAL);
         boostGroup.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        org.telegram.ui.Components.MDGramAppearance.settingsGroup(boostGroup, getResourceProvider());
         content.addView(boostGroup);
         // Acelerador de descarga (FUNCIONAL → FileLoadOperation), como el control de tres puntos de V21.
         boostGroup.addView(buildDownloadBoostSlider(context));
@@ -180,6 +184,7 @@ public class GeneralSettingsActivity extends BaseFragment {
         LinearLayout genGroup = new LinearLayout(context);
         genGroup.setOrientation(LinearLayout.VERTICAL);
         genGroup.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        org.telegram.ui.Components.MDGramAppearance.settingsGroup(genGroup, getResourceProvider());
         content.addView(genGroup);
 
         // Redondeo de números (FUNCIONAL — hook en LocaleController.formatShortNumber)

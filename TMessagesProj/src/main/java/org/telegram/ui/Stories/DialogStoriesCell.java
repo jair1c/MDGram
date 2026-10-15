@@ -687,6 +687,20 @@ public class DialogStoriesCell extends FrameLayout implements NotificationCenter
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
+        final int mdgramClipSave = canvas.save();
+        if (mdgramGlassBackground != null) {
+            float collapse = Math.max(0f, Math.min(1f, collapsedProgress1));
+            canvas.clipRect(dp(56) * collapse, 0, getWidth() - dp(56) * collapse, getHeight());
+        }
+        if (mdgramGlassBackground != null) {
+            float expanded = 1f - Math.max(0f, Math.min(1f, collapsedProgress1));
+            if (expanded > 0f) {
+                mdgramGlassBackground.updateColors();
+                mdgramGlassBackground.setAlpha((int) (255 * expanded));
+                mdgramGlassBackground.setBounds(dp(8), dp(3), getWidth() - dp(8), getHeight() - dp(3));
+                mdgramGlassBackground.draw(canvas);
+            }
+        }
         canvas.save();
         if (clipTop > 0) {
             canvas.clipRect(0, clipTop, getMeasuredWidth(), getMeasuredHeight());
@@ -948,7 +962,8 @@ public class DialogStoriesCell extends FrameLayout implements NotificationCenter
             // MDGram V21 centers the compact stories group and keeps the hamburger
             // area free at the left edge of the action bar.
             float groupWidth = (lastViewRight + telegramLogoView.getMeasuredWidth()) - menuItemsOffset;
-            float centerShift = Math.max(0f, (getMeasuredWidth() - groupWidth) / 2f - menuItemsOffset) * progress;
+            float centerShift = org.telegram.messenger.MDGramConfig.useRoundedInterface() ? 0f
+                    : Math.max(0f, (getMeasuredWidth() - groupWidth) / 2f - menuItemsOffset) * progress;
             listViewMini.setTranslationX(menuItemsOffset + centerShift);
             recyclerListView.setTranslationX(centerShift);
             titleView.setTranslationX(lastViewRight + centerShift);
@@ -994,6 +1009,7 @@ public class DialogStoriesCell extends FrameLayout implements NotificationCenter
         }
 
         canvas.restore();
+        canvas.restoreToCount(mdgramClipSave);
     }
 
     private LinearGradient ellipsizeGradient;
@@ -1051,6 +1067,26 @@ public class DialogStoriesCell extends FrameLayout implements NotificationCenter
 
     private OvershootInterpolator storiesExpandInterpolator = new OvershootInterpolator(expandedSpringCoef);
     private OvershootInterpolator storiesCollapseInterpolator = new OvershootInterpolator(collapsedSpringCoef);
+
+    private org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable mdgramGlassBackground;
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        if (mdgramGlassBackground != null && collapsedProgress1 > 0.5f
+                && (event.getX() < dp(56) || event.getX() > getWidth() - dp(56))) {
+            return false; // Collapsed stories must not intercept the header's menu/theme buttons.
+        }
+        return super.dispatchTouchEvent(event);
+    }
+
+    public void setupMDGramGlass(org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory factory,
+            org.telegram.ui.ActionBar.Theme.ResourcesProvider resources) {
+        mdgramGlassBackground = factory.create(this, org.telegram.ui.Components.MDGramGlass.material(resources, true));
+        mdgramGlassBackground.setRadius(dp(org.telegram.messenger.MDGramConfig.useRoundedInterface() ? 24 : 0));
+        mdgramGlassBackground.setPadding(0);
+        checkUi_titleVisibility();
+        invalidate();
+    }
 
     public void setProgressToCollapse(float progress) {
         setProgressToCollapse(progress, true);
@@ -2219,7 +2255,8 @@ public class DialogStoriesCell extends FrameLayout implements NotificationCenter
     }
 
     private void checkUi_titleVisibility() {
-        final float progress = MathUtils.clamp(Math.min(collapsedProgress, collapsedProgress2), 0, 1);
+        final float progress = mdgramGlassBackground != null ? 0f
+                : MathUtils.clamp(Math.min(collapsedProgress, collapsedProgress2), 0, 1);
         final float titleVisibility = animatorHasTitleText.getFloatValue();
         final float logoVisibility = 1f - titleVisibility;
         final float titleAlpha = titleVisibility * progress;

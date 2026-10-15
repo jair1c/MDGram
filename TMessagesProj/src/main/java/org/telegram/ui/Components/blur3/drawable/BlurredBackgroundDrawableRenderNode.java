@@ -53,6 +53,7 @@ public class BlurredBackgroundDrawableRenderNode extends BlurredBackgroundDrawab
     }
 
     private LiquidGlassEffect liquidGlassEffect;
+    private boolean liquidGlassSuppressed;
 
     @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
     public void setLiquidGlassEffectAllowed() {
@@ -112,7 +113,7 @@ public class BlurredBackgroundDrawableRenderNode extends BlurredBackgroundDrawab
         c = renderNodeFill.beginRecording();
         c.save();
         c.translate(-sL, -sT);
-        if (liquidGlassEffect != null && Build.VERSION.SDK_INT >= 33) {
+        if (liquidGlassEffect != null && !liquidGlassSuppressed && Build.VERSION.SDK_INT >= 33) {
             final int thickness = Math.max(Math.min(
                 boundProps.liquidThickness <= 0 ? dp(11) : boundProps.liquidThickness,
                 Math.min(boundProps.boundsWithPadding.width(), boundProps.boundsWithPadding.height()) / 5), 1);
@@ -136,7 +137,7 @@ public class BlurredBackgroundDrawableRenderNode extends BlurredBackgroundDrawab
             c.drawColor(backgroundColor);
         } else {
             c.drawRenderNode(renderNodeFill);
-            if (liquidGlassEffect == null && Color.alpha(backgroundColor) != 0) {
+            if ((liquidGlassEffect == null || liquidGlassSuppressed) && Color.alpha(backgroundColor) != 0) {
                 c.drawColor(backgroundColor);
             }
         }
@@ -173,6 +174,20 @@ public class BlurredBackgroundDrawableRenderNode extends BlurredBackgroundDrawab
         if (!canvas.isHardwareAccelerated()) {
             drawSource(canvas, source);
             return;
+        }
+
+        if (liquidGlassEffect != null && Build.VERSION.SDK_INT >= 33) {
+            boolean suppress = org.telegram.messenger.LiteMode.isPowerSaverApplied();
+            if (suppress != liquidGlassSuppressed) {
+                liquidGlassSuppressed = suppress;
+                if (suppress) {
+                    renderNodeFill.setRenderEffect(null);
+                } else {
+                    // A new instance restores the effect even when shader uniforms are unchanged.
+                    liquidGlassEffect = new LiquidGlassEffect(renderNodeFill);
+                }
+                renderNodeInvalidated = true;
+            }
         }
 
         if (!renderNode.hasDisplayList()) {

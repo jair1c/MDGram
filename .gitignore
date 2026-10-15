@@ -29,6 +29,7 @@ keystore.properties
 TMessagesProj/jni/ffmpeg/build_android
 .mdgram_backup/
 .test-artifacts/
+APK/
 
 ## Local session journal; public documentation is PROJECT_STATUS/RELEASE_NOTES.
 SESSION_NOTES.md

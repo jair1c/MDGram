@@ -2854,9 +2854,9 @@ public class EmojiView extends FrameLayout implements
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             blurredBackgroundSourceRenderNode = new BlurredBackgroundSourceRenderNode(null);
             blurredBackgroundDrawableFactory = new BlurredBackgroundDrawableViewFactory(blurredBackgroundSourceRenderNode);
-            blurredBackgroundDrawableFactory.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+            blurredBackgroundDrawableFactory.setLiquidGlassEffectAllowed(MDGramGlass.useLens());
 
-            scrollableViewNoiseSuppressor = new DownscaleScrollableNoiseSuppressor();
+            scrollableViewNoiseSuppressor = new DownscaleScrollableNoiseSuppressor(false, true, MDGramGlass.useLens());
         } else {
             blurredBackgroundSourceRenderNode = null;
             blurredBackgroundDrawableFactory = new BlurredBackgroundDrawableViewFactory(blurredBackgroundSourceColor);
@@ -2931,28 +2931,28 @@ public class EmojiView extends FrameLayout implements
     public void setBlurredBackgroundDrawableFactory(BlurredBackgroundDrawableViewFactory factory) {
         if (backspaceButton != null) {
             backspaceButton.setBackground(factory.create(backspaceButton)
-                .setColorProvider(BlurredBackgroundProviderImpl.emojiViewButton(resourcesProvider))
+                .setColorProvider((org.telegram.messenger.MDGramConfig.useLiquidGlass() ? MDGramGlass.material(resourcesProvider, false) : BlurredBackgroundProviderImpl.emojiViewButton(resourcesProvider)))
                 .setRadius(dp(18))
                 .setPadding(dp(6)));
         }
 
         if (searchButton != null) {
             searchButton.setBackground(factory.create(searchButton)
-                .setColorProvider(BlurredBackgroundProviderImpl.emojiViewButton(resourcesProvider))
+                .setColorProvider((org.telegram.messenger.MDGramConfig.useLiquidGlass() ? MDGramGlass.material(resourcesProvider, false) : BlurredBackgroundProviderImpl.emojiViewButton(resourcesProvider)))
                 .setRadius(dp(18))
                 .setPadding(dp(6)));
         }
 
         if (typeTabs != null) {
             typeTabs.setBackground(factory.create(typeTabs)
-                .setColorProvider(BlurredBackgroundProviderImpl.emojiViewButton(resourcesProvider))
+                .setColorProvider((org.telegram.messenger.MDGramConfig.useLiquidGlass() ? MDGramGlass.material(resourcesProvider, false) : BlurredBackgroundProviderImpl.emojiViewButton(resourcesProvider)))
                 .setRadius(dp(18))
                 .setPadding(dp(6)));
         }
 
         if (stickerSettingsButton != null) {
             stickerSettingsButton.setBackground(factory.create(stickerSettingsButton)
-                .setColorProvider(BlurredBackgroundProviderImpl.emojiViewButton(resourcesProvider))
+                .setColorProvider((org.telegram.messenger.MDGramConfig.useLiquidGlass() ? MDGramGlass.material(resourcesProvider, false) : BlurredBackgroundProviderImpl.emojiViewButton(resourcesProvider)))
                 .setRadius(dp(18))
                 .setPadding(dp(6)));
         }
@@ -4528,8 +4528,8 @@ public class EmojiView extends FrameLayout implements
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && scrollableViewNoiseSuppressor != null) {
             ViewPositionWatcher.computeRectInParent(typeTabs, this, blurredRectF);
             blurredRectF.inset(
-                LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0 : -dp(48),
-                LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0 : -dp(48)
+                MDGramGlass.useLens() ? 0 : -dp(48),
+                MDGramGlass.useLens() ? 0 : -dp(48)
             );
             blurredRectF.right = getMeasuredWidth();
             blurredRectF.bottom = Math.min(blurredRectF.bottom, getMeasuredHeight());

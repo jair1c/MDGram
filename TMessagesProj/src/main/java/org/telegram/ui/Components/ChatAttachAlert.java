@@ -1302,19 +1302,19 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         iBlur3SourceColor = new BlurredBackgroundSourceColor();
         iBlur3SourceColor.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            scrollableViewNoiseSuppressor = new DownscaleScrollableNoiseSuppressor();
+            scrollableViewNoiseSuppressor = new DownscaleScrollableNoiseSuppressor(false, true, MDGramGlass.useLens());
             iBlur3SourceGlass = new BlurredBackgroundSourceRenderNode(null);
             iBlur3SourceGlass.setupRenderer(new RenderNodeWithHash.Renderer() {
                 @Override
                 public void renderNodeCalculateHash(IBlur3Hash hash) {
                     hash.add(getThemedColor(Theme.key_windowBackgroundWhite));
-                    hash.add(SharedConfig.chatBlurEnabled());
+                    hash.add((SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass()));
                 }
 
                 @Override
                 public void renderNodeUpdateDisplayList(Canvas canvas) {
                     canvas.drawColor(getThemedColor(Theme.key_windowBackgroundWhite));
-                    if (SharedConfig.chatBlurEnabled()) {
+                    if ((SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass())) {
                         scrollableViewNoiseSuppressor.draw(canvas, DownscaleScrollableNoiseSuppressor.DRAW_GLASS);
                     }
                 }
@@ -1325,22 +1325,22 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                 @Override
                 public void renderNodeCalculateHash(IBlur3Hash hash) {
                     hash.add(getThemedColor(Theme.key_windowBackgroundWhite));
-                    hash.add(SharedConfig.chatBlurEnabled());
+                    hash.add((SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass()));
                 }
 
                 @Override
                 public void renderNodeUpdateDisplayList(Canvas canvas) {
                     canvas.drawColor(getThemedColor(Theme.key_windowBackgroundWhite));
-                    if (SharedConfig.chatBlurEnabled()) {
+                    if ((SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass())) {
                         scrollableViewNoiseSuppressor.draw(canvas, DownscaleScrollableNoiseSuppressor.DRAW_FROSTED_GLASS);
                     }
                 }
             });
 
             iBlur3FactoryLiquidGlass = new BlurredBackgroundDrawableViewFactory(iBlur3SourceGlass);
-            iBlur3FactoryLiquidGlass.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+            iBlur3FactoryLiquidGlass.setLiquidGlassEffectAllowed(MDGramGlass.useLens());
             iBlur3FactoryFrostedLiquidGlass = new BlurredBackgroundDrawableViewFactory(iBlur3SourceGlassFrosted);
-            iBlur3FactoryFrostedLiquidGlass.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+            iBlur3FactoryFrostedLiquidGlass.setLiquidGlassEffectAllowed(MDGramGlass.useLens());
         } else {
             scrollableViewNoiseSuppressor = null;
             iBlur3SourceGlassFrosted = null;
@@ -2748,13 +2748,13 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         };
         bottomFadeDrawable = new BlurredBackgroundWithFadeDrawable(
                 iBlur3FactoryFade.create(bottomFadeView, null));
-        if (!SharedConfig.chatBlurEnabled() || LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) || true) {
+        if (!(SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass()) || MDGramGlass.useLens() || true) {
             bottomFadeDrawable.setFadeHeight(dp(72), true);
         }
 
         containerView.addView(bottomFadeView, LayoutHelper.createFrameMatchParent());
 
-        BlurredBackgroundDrawable tabsViewBackground = iBlur3FactoryLiquidGlass.create(buttonsRecyclerViewWrapper, BlurredBackgroundProviderImpl.mainTabs(resourcesProvider));
+        BlurredBackgroundDrawable tabsViewBackground = iBlur3FactoryLiquidGlass.create(buttonsRecyclerViewWrapper, (org.telegram.messenger.MDGramConfig.useLiquidGlass() ? MDGramGlass.material(resourcesProvider, false) : BlurredBackgroundProviderImpl.mainTabs(resourcesProvider)));
         tabsViewBackground.setRadius(dp(56 / 2f));
         tabsViewBackground.setPadding(dp(7));
         buttonsRecyclerViewWrapper.setBackground(tabsViewBackground);
@@ -3069,13 +3069,13 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         };
         frameLayout2.addView(captionContainer, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
 
-        emojiViewChildBg = iBlur3FactoryFrostedLiquidGlass.create(sizeNotifierFrameLayout, BlurredBackgroundProviderImpl.inputFieldDialogActivity(resourcesProvider));
+        emojiViewChildBg = iBlur3FactoryFrostedLiquidGlass.create(sizeNotifierFrameLayout, (org.telegram.messenger.MDGramConfig.useLiquidGlass() ? MDGramGlass.material(resourcesProvider, false) : BlurredBackgroundProviderImpl.inputFieldDialogActivity(resourcesProvider)));
         emojiViewChildBg.enableInAppKeyboardOptimization();
         emojiViewChildBg.setRadius(dp(29), dp(29), 0, 0);
         emojiViewChildBg.setThickness(dp(32));
         emojiViewChildBg.setIntensity(0.4f);
 
-        captionContainerBg = iBlur3FactoryLiquidGlass.create(captionContainer, BlurredBackgroundProviderImpl.inputFieldDialogActivity(resourcesProvider));
+        captionContainerBg = iBlur3FactoryLiquidGlass.create(captionContainer, (org.telegram.messenger.MDGramConfig.useLiquidGlass() ? MDGramGlass.material(resourcesProvider, false) : BlurredBackgroundProviderImpl.inputFieldDialogActivity(resourcesProvider)));
         captionContainerBg.setRadius(dp(22));
         captionContainerBg.setPadding(dp(7));
         captionContainer.setPadding(dp(7), dp(5), dp(7), dp(5));
@@ -3484,7 +3484,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
 
         commentTextView.addView(moveCaptionButton, LayoutHelper.createFrame(40, 40, Gravity.BOTTOM | Gravity.RIGHT, 0, 0, 0, 4));
 
-        BlurredBackgroundDrawable drawable2 = iBlur3FactoryLiquidGlass.create(topCommentContainer, BlurredBackgroundProviderImpl.inputFieldDialogActivity(resourcesProvider));
+        BlurredBackgroundDrawable drawable2 = iBlur3FactoryLiquidGlass.create(topCommentContainer, (org.telegram.messenger.MDGramConfig.useLiquidGlass() ? MDGramGlass.material(resourcesProvider, false) : BlurredBackgroundProviderImpl.inputFieldDialogActivity(resourcesProvider)));
         drawable2.setRadius(dp(22));
         drawable2.setPadding(dp(7));
         topCommentContainer.setBackground(drawable2);
@@ -3592,6 +3592,11 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
                 return getThemedColor(Theme.key_dialogFloatingButton);
             }
         };
+        writeButton.setMDGramTransparentPlane(true);
+        if (org.telegram.messenger.MDGramConfig.useLiquidGlass()) {
+            writeButton.setBlurredBackgroundDrawable(iBlur3FactoryLiquidGlass.create(
+                    writeButton, MDGramGlass.material(resourcesProvider, false)));
+        }
         writeButton.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         writeButtonContainer.addView(writeButton, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
         writeButton.setTranslationX(backgroundPaddingLeft);
@@ -4108,7 +4113,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
         }
 
         if (photoLayout != null) {
-            photoLayout.gridView.getFastScroll().applyBlurDrawables(iBlur3FactoryLiquidGlass, BlurredBackgroundProviderImpl.topPanel(resourcesProvider));
+            photoLayout.gridView.getFastScroll().applyBlurDrawables(iBlur3FactoryLiquidGlass, (org.telegram.messenger.MDGramConfig.useLiquidGlass() ? MDGramGlass.material(resourcesProvider, false) : BlurredBackgroundProviderImpl.topPanel(resourcesProvider)));
         }
 
         passcodeView = new PasscodeView(context);
@@ -4116,7 +4121,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
 
         BlurredBackgroundProvider colorProvider = new BlurredBackgroundProviderBuilder(resourcesProvider)
             .setBackgroundColor((r, isDark) -> {
-                final float alpha = LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0.85f : 0.76f;
+                final float alpha = MDGramGlass.useLens() ? 0.85f : 0.76f;
                 final int colorBg = Theme.getColor(isDark ? Theme.key_windowBackgroundGray : Theme.key_dialogBackgroundGray, r);
                 final int colorTarget = Theme.getColor(Theme.key_windowBackgroundWhite, r);
                 if (hasOverridenWebviewBackgroundColor) {
@@ -7279,7 +7284,7 @@ public class ChatAttachAlert extends BottomSheet implements NotificationCenter.N
 
         final int bottomBlurHeight = Math.max(AndroidUtilities.navigationBarHeight, getEmojiPadding()) + dp(180);
         iBlur3PositionMainTabs.set(0, containerView.getMeasuredHeight() - bottomBlurHeight, containerView.getMeasuredWidth(), containerView.getMeasuredHeight());
-        iBlur3PositionMainTabs.inset(0, LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS) ? 0 : -dp(48));
+        iBlur3PositionMainTabs.inset(0, MDGramGlass.useLens() ? 0 : -dp(48));
 
         boolean hasFastScroll = false;
         if (currentAttachLayout == photoLayout && photoLayout != null && photoLayout.gridView.getFastScroll() != null) {

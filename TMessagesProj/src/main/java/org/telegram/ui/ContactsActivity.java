@@ -157,7 +157,8 @@ public class ContactsActivity extends BaseFragment implements FactorAnimator.Tar
     private boolean mdgramSearchOpen;
 
     private boolean isMdgramMainContacts() {
-        return hasMainTabs && !destroyAfterSelect && !returnAsResult && !createSecretChat;
+        return !org.telegram.messenger.MDGramConfig.useRoundedInterface()
+                && hasMainTabs && !destroyAfterSelect && !returnAsResult && !createSecretChat;
     }
     private boolean destroyAfterSelect;
     private boolean returnAsResult;

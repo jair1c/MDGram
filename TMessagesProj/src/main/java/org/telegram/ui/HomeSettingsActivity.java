@@ -36,6 +36,8 @@ public class HomeSettingsActivity extends BaseFragment {
     private FrameLayout homePreview;
     private TextSettingsCell homeTitleStyleCell;
     private FoldersPreviewCell folderPreview;
+    private TextCheckCell navigationCell;
+    private TextCheckCell liquidGlassCell;
 
     @Override
     public View createView(Context context) {
@@ -67,6 +69,7 @@ public class HomeSettingsActivity extends BaseFragment {
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(content, new FrameLayout.LayoutParams(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        org.telegram.ui.Components.MDGramAppearance.settingsPage(root, content, getResourceProvider());
 
         LinearLayout g1 = group(context, content);
         addCheck(context, g1, "Título de inicio", "Personalizar el título de la pantalla principal", MDGramConfig.homeTitleAsName(), false, cell -> {
@@ -124,7 +127,7 @@ public class HomeSettingsActivity extends BaseFragment {
             refreshHomePreview(context);
             toast("Reinicia MDGram para aplicar");
         });
-        addCheck(context, g3, "Usar nueva navegación", "Chats, Contactos, Ajustes y Perfil. Se aplica al volver al inicio.", MDGramConfig.useNewNavigation(), false, cell -> {
+        navigationCell = addCheck(context, g3, "Interfaz de píldora", "Recupera las formas de Cherrygram en navegación, chats, contactos y ajustes, conservando la identidad de MDGram. Se aplica al volver al inicio.", MDGramConfig.useNewNavigation(), false, cell -> {
             boolean enabled = !cell.isChecked();
             cell.setChecked(enabled);
             MDGramConfig.setUseNewNavigation(enabled);
@@ -132,6 +135,19 @@ public class HomeSettingsActivity extends BaseFragment {
             bottomPreview.addView(buildBottomPreview(context), LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
             android.view.ViewGroup.LayoutParams previewParams = bottomPreview.getLayoutParams();
             previewParams.height = org.telegram.messenger.AndroidUtilities.dp(enabled ? 60 : 92);
+            bottomPreview.setLayoutParams(previewParams);
+            refreshHomePreview(context);
+        });
+
+        liquidGlassCell = addCheck(context, g3, "Liquid Glass", "Efecto de vidrio independiente del estilo plano o píldora. Refracción en Android 13+. Se aplica al volver al inicio.", MDGramConfig.useLiquidGlass(), false, cell -> {
+            boolean enabled = !cell.isChecked();
+            cell.setChecked(enabled);
+            MDGramConfig.setUseLiquidGlass(enabled);
+            navigationCell.setChecked(MDGramConfig.useNewNavigation());
+            bottomPreview.removeAllViews();
+            bottomPreview.addView(buildBottomPreview(context), LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+            android.view.ViewGroup.LayoutParams previewParams = bottomPreview.getLayoutParams();
+            previewParams.height = org.telegram.messenger.AndroidUtilities.dp(MDGramConfig.useNewNavigation() ? 60 : 92);
             bottomPreview.setLayoutParams(previewParams);
             refreshHomePreview(context);
         });
@@ -204,7 +220,7 @@ public class HomeSettingsActivity extends BaseFragment {
         }
         if (homePreview == null) return;
         homePreview.removeAllViews();
-        FrameLayout scene = new FrameLayout(context);
+        org.telegram.ui.Components.MDGramGlassPreview scene = new org.telegram.ui.Components.MDGramGlassPreview(context, getResourceProvider());
         scene.setBackground(rounded(getThemedColor(Theme.key_windowBackgroundGray), 20));
         homePreview.addView(scene, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP, 12, 8, 12, 8));
         org.telegram.tgnet.TLRPC.User user = getUserConfig().getCurrentUser();
@@ -226,6 +242,7 @@ public class HomeSettingsActivity extends BaseFragment {
             search.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
             search.setBackground(rounded(getThemedColor(Theme.key_windowBackgroundWhite), 18));
             scene.addView(search, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 34, Gravity.TOP, 12, 46, 12, 0));
+            scene.glass(search, 18);
             folderTop = 84;
         }
         FrameLayout folders = new FrameLayout(context);
@@ -248,19 +265,26 @@ public class HomeSettingsActivity extends BaseFragment {
         time.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteGrayText));
         chat.addView(time, LayoutHelper.createFrame(44, 22, Gravity.TOP | Gravity.RIGHT, 0, 8, 8, 0));
         scene.addView(chat, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 64, Gravity.TOP, 0, chatTop, 0, 0));
+        TextView sample = previewText(context, "●  Telegram        Mensaje de ejemplo", 14, false);
+        sample.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueText));
+        sample.setGravity(Gravity.CENTER_VERTICAL);
+        scene.addView(sample, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 44, Gravity.TOP, 16, chatTop + 64, 16, 0));
         if (!MDGramConfig.hideFab()) {
             TextView fab = previewText(context, "+", 24, true);
             fab.setGravity(Gravity.CENTER);
-            fab.setTextColor(0xFFFFFFFF);
+            fab.setTextColor(MDGramConfig.useLiquidGlass() ? getThemedColor(Theme.key_windowBackgroundWhiteBlueText) : 0xFFFFFFFF);
             fab.setBackground(rounded(getThemedColor(Theme.key_windowBackgroundWhiteBlueText), 12));
             scene.addView(fab, LayoutHelper.createFrame(36, 36, Gravity.BOTTOM | Gravity.RIGHT, 0, 0, 16,
                     CherrygramAppearanceConfig.INSTANCE.getShowMainTabs() ? 65 : 12));
+            scene.glass(fab, MDGramConfig.useRoundedInterface() ? 18 : 12);
         }
         if (CherrygramAppearanceConfig.INSTANCE.getShowMainTabs()) {
-            scene.addView(buildBottomPreview(context), LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 56, Gravity.BOTTOM, 8, 0, 8, 4));
+            View tabs = buildBottomPreview(context, scene);
+            scene.addView(tabs, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 56, Gravity.BOTTOM, 8, 0, 8, 4));
         }
         scene.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-        homePreview.setContentDescription("Vista previa de la pantalla principal: " + MDGramConfig.homeTitle(currentAccount));
+        homePreview.setContentDescription("Vista previa de la pantalla principal: " + MDGramConfig.homeTitle(currentAccount)
+                + (MDGramConfig.useLiquidGlass() ? ", Liquid Glass activado" : ", Liquid Glass desactivado"));
     }
 
     private View buildFolderPreview(Context context) {
@@ -268,6 +292,16 @@ public class HomeSettingsActivity extends BaseFragment {
     }
 
     private View buildBottomPreview(Context context) {
+        org.telegram.ui.Components.MDGramGlassPreview preview = new org.telegram.ui.Components.MDGramGlassPreview(context, getResourceProvider());
+        TextView sample = previewText(context, "●  Dino        Hola, ¿cómo estás?", 16, false);
+        sample.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlueText));
+        sample.setGravity(Gravity.CENTER);
+        preview.addView(sample, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        preview.addView(buildBottomPreview(context, preview), LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        return preview;
+    }
+
+    private View buildBottomPreview(Context context, org.telegram.ui.Components.MDGramGlassPreview preview) {
         LinearLayout row = new LinearLayout(context);
         row.setGravity(Gravity.CENTER);
         row.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundGray));
@@ -290,6 +324,7 @@ public class HomeSettingsActivity extends BaseFragment {
             tab.setSelected(i == (modern ? 0 : 2), false);
             row.addView(tab, new LinearLayout.LayoutParams(0, LayoutHelper.MATCH_PARENT, 1));
         }
+        preview.glass(row, modern ? 30 : 0);
         return row;
     }
 
@@ -303,6 +338,7 @@ public class HomeSettingsActivity extends BaseFragment {
         LinearLayout g = new LinearLayout(context);
         g.setOrientation(LinearLayout.VERTICAL);
         g.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        org.telegram.ui.Components.MDGramAppearance.settingsGroup(g, getResourceProvider());
         parent.addView(g);
         return g;
     }
@@ -311,7 +347,7 @@ public class HomeSettingsActivity extends BaseFragment {
         void onClick(TextCheckCell cell);
     }
 
-    private void addCheck(Context context, LinearLayout group, String text, String subtitle, boolean checked, boolean divider, CheckClick l) {
+    private TextCheckCell addCheck(Context context, LinearLayout group, String text, String subtitle, boolean checked, boolean divider, CheckClick l) {
         TextCheckCell cell = new TextCheckCell(context);
         cell.applyMDGramSettingsStyle();
         if (subtitle != null) {
@@ -321,6 +357,7 @@ public class HomeSettingsActivity extends BaseFragment {
         }
         cell.setOnClickListener(v -> l.onClick(cell));
         group.addView(cell);
+        return cell;
     }
 
     private TextSettingsCell addValue(Context context, LinearLayout group, String text, String value, boolean divider, Runnable onClick) {

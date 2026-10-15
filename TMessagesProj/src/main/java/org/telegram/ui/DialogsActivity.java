@@ -878,7 +878,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 rightSlidingProgress = rightSlidingDialogContainer.openedProgress;
             }
             if (hasStories) {
-                int storiesHeight = dp(DialogStoriesCell.HEIGHT_IN_DP);
+                int storiesHeight = getMDGramStoriesHeight();
                 h += storiesHeight * (1f - searchAnimationProgress) * (1f - rightSlidingProgress) * (1f - progressToActionMode);
             }
             h += storiesOverscroll;
@@ -945,6 +945,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
         @Override
         public void drawBlurRect(Canvas canvas, float y, Rect rectTmp, Paint blurScrimPaint, boolean top) {
+            if (top && blurScrimPaint == actionBarDefaultPaint && hasMainTabs
+                    && org.telegram.messenger.MDGramConfig.useLiquidGlass()) {
+                return; // Independent header surfaces replace the full-width opaque plate.
+            }
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || !SharedConfig.chatBlurEnabled() || iBlur3SourceGlassFrosted == null || !BlurredBackgroundProviderImpl.checkBlurEnabled(currentAccount, resourceProvider)) {
                 canvas.drawRect(rectTmp, blurScrimPaint);
                 return;
@@ -984,7 +988,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                             RecyclerView.ViewHolder archiveHolder = recyclerView.findViewHolderForLayoutPosition(0);
                             if (archiveHolder == null) {
                                 fixScrollYAfterArchiveOpened = false;
-                            } else if (archiveHolder.itemView.getBottom() <= recyclerView.getPaddingTop() - dp(DialogStoriesCell.HEIGHT_IN_DP)) {
+                            } else if (archiveHolder.itemView.getBottom() <= recyclerView.getPaddingTop() - getMDGramStoriesHeight()) {
                                 fixScrollYAfterArchiveOpened = false;
                             } else if (archiveHolder.itemView.getTop() >= recyclerView.getPaddingTop()) {
                                 fixScrollYAfterArchiveOpened = false;
@@ -1061,8 +1065,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             storiesYOffset = 0;
             final int reservedSearchFieldHeight = getSearchFieldReservedHeight();
             tabsYOffset -= Math.min(
-                dp(hasStories ? DialogStoriesCell.HEIGHT_IN_DP : 0) + reservedSearchFieldHeight + scrollYOffset,
-                progressToActionMode * (dp(hasStories ? DialogStoriesCell.HEIGHT_IN_DP : 0) + reservedSearchFieldHeight)
+                (hasStories ? getMDGramStoriesHeight() : 0) + reservedSearchFieldHeight + scrollYOffset,
+                progressToActionMode * ((hasStories ? getMDGramStoriesHeight() : 0) + reservedSearchFieldHeight)
             );
             storiesYOffset = tabsYOffset;
             if ((rightSlidingDialogContainer != null && rightSlidingDialogContainer.hasFragment())) {
@@ -1077,7 +1081,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     tabsYOffset -= (1f - animatorFilterTabsVisible.getFloatValue()) * filterTabsView.getMeasuredHeight();
                 }
                 if (fragmentSearchField != null) {
-                    fragmentSearchField.setTranslationY(lerp(scrollYOffset + tabsYOffset, -dp(hasStories ? DialogStoriesCell.HEIGHT_IN_DP : 0), rightSlidingProgress) + getSearchFieldAdditionOffset());
+                    fragmentSearchField.setTranslationY(lerp(scrollYOffset + tabsYOffset, -(hasStories ? getMDGramStoriesHeight() : 0), rightSlidingProgress) + getSearchFieldAdditionOffset());
                 }
                 float rightFragmentOffset = 0;
                 if (rightFragmentTransitionInProgress) {
@@ -1086,7 +1090,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 }
                 float addH = 0;
                 if (hasStories) {
-                    addH += dp(DialogStoriesCell.HEIGHT_IN_DP);
+                    addH += getMDGramStoriesHeight();
                 }
                 addH += getSearchFieldReservedHeight();
                 addH *= rightSlidingDialogContainer.openedProgress;
@@ -1185,7 +1189,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                             h += dp(50);
                         }
                         if (hasStories) {
-                            h += dp(DialogStoriesCell.HEIGHT_IN_DP);
+                            h += getMDGramStoriesHeight();
                         }
                         h += getSearchFieldReservedHeight();
                     }
@@ -1307,7 +1311,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     //    childTop -= dp(SEARCH_FIELD_HEIGHT);
                     //}
                     if (hasStories && child == fragmentSearchField) {
-                        childTop += dp(DialogStoriesCell.HEIGHT_IN_DP);
+                        childTop += getMDGramStoriesHeight();
                     }
                     if (child == dialogStoriesCell && dialogStoriesCell.getPremiumHint() != null) {
                         dialogStoriesCell.getPremiumHint().layout(childLeft, childTop - dp(24 + 8 + 22) + height, childLeft + width, childTop - dp(24 + 8 + 22) + height + dialogStoriesCell.getPremiumHint().getMeasuredHeight());
@@ -1675,18 +1679,18 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         float containersAlpha;
 
         if (hasStories || animateToHasStories) {
-            float p = Utilities.clamp(-scrollYOffset / dp(DialogStoriesCell.HEIGHT_IN_DP), 1f, 0f);
+            float p = Utilities.clamp(-scrollYOffset / getMDGramStoriesHeight(), 1f, 0f);
             if (progressToActionMode == 1f) {
                 p = 1f;
             }
             float pHalf = Utilities.clamp(p / 0.5f, 1f, 0f);
             dialogStoriesCell.setClipTop(0);
             if (!hasStories && animateToHasStories) {
-                dialogStoriesCell.setTranslationY(-dp(DialogStoriesCell.HEIGHT_IN_DP) - dp(8));
+                dialogStoriesCell.setTranslationY(-getMDGramStoriesHeight() - dp(8));
                 dialogStoriesCell.setProgressToCollapse(1f);
                 containersAlpha = 1f - progressToDialogStoriesCell;
             } else {
-                dialogStoriesCell.setTranslationY(Math.max(scrollYOffset, -getMaxScrollYOffsetWithoutSearch()) + storiesYOffset + storiesOverscroll / 2f - dp(8));
+                dialogStoriesCell.setTranslationY(Math.max(scrollYOffset, -getMaxScrollYOffsetWithoutSearch()) + storiesYOffset + storiesOverscroll / 2f - dp(8) + getMDGramStoriesGap());
                 dialogStoriesCell.setProgressToCollapse(p, !rightSlidingDialogContainer.hasFragment());
                 if (!animateToHasStories) {
                     containersAlpha = 1f - progressToDialogStoriesCell;
@@ -1697,13 +1701,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             actionBar.setTranslationY(0);
         } else {
             if (hasOnlySlefStories) {
-                dialogStoriesCell.setTranslationY(-dp(DialogStoriesCell.HEIGHT_IN_DP) + Math.max(scrollYOffset, -getMaxScrollYOffsetWithoutSearch()) - dp(8));
+                dialogStoriesCell.setTranslationY(-getMDGramStoriesHeight() + Math.max(scrollYOffset, -getMaxScrollYOffsetWithoutSearch()) - dp(8));
                 dialogStoriesCell.setProgressToCollapse(1f);
                 dialogStoriesCell.setClipTop((int) (AndroidUtilities.statusBarHeight - dialogStoriesCell.getY()));
             }
             containersAlpha = 1f - progressToDialogStoriesCell;
 
             actionBar.setTranslationY(0);
+        }
+        if (hasMainTabs && org.telegram.messenger.MDGramConfig.useLiquidGlass()) {
+            containersAlpha = 1f;
         }
         containersAlpha *= (1f - factorSearch);
         if (containersAlpha != 1f) {
@@ -2107,7 +2114,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             ignoreLayout = true;
             t = ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0);
             if (hasStories && !actionModeFullyShowed) {
-                t += dp(DialogStoriesCell.HEIGHT_IN_DP);
+                t += getMDGramStoriesHeight();
             }
             if (!actionModeFullyShowed) {
                 t += getSearchFieldReservedHeight();
@@ -2134,7 +2141,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 setTopGlowOffset(t);
                 setPadding(0, t, 0, b);
                 if (hasStories) {
-                    parentPage.progressView.setPaddingTop(t - dp(DialogStoriesCell.HEIGHT_IN_DP));
+                    parentPage.progressView.setPaddingTop(t - getMDGramStoriesHeight());
                 } else {
                     parentPage.progressView.setPaddingTop(t);
                 }
@@ -2190,7 +2197,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     int offset = (dialogCell.getMeasuredHeight() + (dialogCell.getTop() - getPaddingTop()));
                     if (hasStories && !dialogStoriesCell.isExpanded()) {
                         fixScrollYAfterArchiveOpened = true;
-                        offset += dp(DialogStoriesCell.HEIGHT_IN_DP);
+                        offset += getMDGramStoriesHeight();
                     }
                     smoothScrollBy(0, offset, CubicBezierInterpolator.EASE_OUT);
                     if (action) {
@@ -2380,7 +2387,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             int maxTop = Integer.MAX_VALUE;
             int padding = 0;//getPaddingTop();
 //            if (hasStories) {
-//                padding -= AndroidUtilities.dp(DialogStoriesCell.HEIGHT_IN_DP);
+//                padding -= AndroidUtilities.getMDGramStoriesHeight();
 //            }
             for (int i = 0; i < anchorListView.getChildCount(); i++) {
                 View child = anchorListView.getChildAt(i);
@@ -2420,7 +2427,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     int p = adapter.findDialogPosition(anchorView.getDialogId());
                     int offset = (int) (anchorView.getTop() - getPaddingTop());
                     if (backward && hasStories) {
-                        offset += dp(DialogStoriesCell.HEIGHT_IN_DP);
+                        offset += getMDGramStoriesHeight();
                     }
                     if (backward) {
                         offset += getSearchFieldReservedHeight();
@@ -2755,15 +2762,15 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         iBlur3SourceColor = new BlurredBackgroundSourceColor();
         iBlur3SourceColor.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            scrollableViewNoiseSuppressor = new DownscaleScrollableNoiseSuppressor();
+            scrollableViewNoiseSuppressor = new DownscaleScrollableNoiseSuppressor(true, false, org.telegram.ui.Components.MDGramGlass.useLens());
             iBlur3SourceGlassFrosted = new BlurredBackgroundSourceRenderNode(null);
             iBlur3SourceGlassFrosted.setupRenderer(new RenderNodeWithHash.Renderer() {
                 @Override
                 public void renderNodeCalculateHash(IBlur3Hash hash) {
                     hash.add(getThemedColor(Theme.key_windowBackgroundWhite));
-                    hash.add(SharedConfig.chatBlurEnabled());
+                    hash.add((SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass()));
 
-                    if (SharedConfig.chatBlurEnabled()) {
+                    if ((SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass())) {
                         TopicsFragment topicsFragment = null;
                         if (rightSlidingDialogContainer != null && rightSlidingDialogContainer.getFragment() instanceof TopicsFragment) {
                             topicsFragment = (TopicsFragment) rightSlidingDialogContainer.getFragment();
@@ -2782,7 +2789,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     final int height = fragmentView.getMeasuredHeight();
 
                     canvas.drawColor(getThemedColor(Theme.key_windowBackgroundWhite));
-                    if (SharedConfig.chatBlurEnabled()) {
+                    if ((SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass())) {
                         TopicsFragment topicsFragment = null;
                         if (rightSlidingDialogContainer != null && rightSlidingDialogContainer.getFragment() instanceof TopicsFragment) {
                             topicsFragment = (TopicsFragment) rightSlidingDialogContainer.getFragment();
@@ -2809,9 +2816,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 @Override
                 public void renderNodeCalculateHash(IBlur3Hash hash) {
                     hash.add(getThemedColor(Theme.key_windowBackgroundWhite));
-                    hash.add(SharedConfig.chatBlurEnabled());
+                    hash.add((SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass()));
 
-                    if (SharedConfig.chatBlurEnabled()) {
+                    if ((SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass())) {
                         TopicsFragment topicsFragment = null;
                         if (rightSlidingDialogContainer != null && rightSlidingDialogContainer.getFragment() instanceof TopicsFragment) {
                             topicsFragment = (TopicsFragment) rightSlidingDialogContainer.getFragment();
@@ -2830,7 +2837,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     final int height = fragmentView.getMeasuredHeight();
 
                     canvas.drawColor(getThemedColor(Theme.key_windowBackgroundWhite));
-                    if (SharedConfig.chatBlurEnabled()) {
+                    if ((SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass())) {
                         TopicsFragment topicsFragment = null;
                         if (rightSlidingDialogContainer != null && rightSlidingDialogContainer.getFragment() instanceof TopicsFragment) {
                             topicsFragment = (TopicsFragment) rightSlidingDialogContainer.getFragment();
@@ -2856,7 +2863,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             iBlur3FactoryFrostedLiquidGlass = new BlurredBackgroundDrawableViewFactory(iBlur3SourceGlassFrosted);
             iBlur3FactoryFrostedLiquidGlass.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
             iBlur3FactoryLiquidGlass = new BlurredBackgroundDrawableViewFactory(iBlur3SourceGlass);
-            iBlur3FactoryLiquidGlass.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+            iBlur3FactoryLiquidGlass.setLiquidGlassEffectAllowed(org.telegram.ui.Components.MDGramGlass.useLens());
             iBlur3FactoryBlur = new BlurredBackgroundDrawableViewFactory(iBlur3SourceGlassFrosted);
         } else {
             scrollableViewNoiseSuppressor = null;
@@ -3311,7 +3318,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
             /*
             AnimatorSet animatorSet = new AnimatorSet();
-            animatorSet.playTogether(ObjectAnimator.ofFloat(this, SCROLL_Y, hasStories ? -dp(DialogStoriesCell.HEIGHT_IN_DP) : 0));
+            animatorSet.playTogether(ObjectAnimator.ofFloat(this, SCROLL_Y, hasStories ? -getMDGramStoriesHeight() : 0));
             animatorSet.setInterpolator(CubicBezierInterpolator.DEFAULT);
             animatorSet.setDuration(250);
             animatorSet.addListener(new AnimatorListenerAdapter() {
@@ -4320,7 +4327,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     int pTop = viewPage.listView.getPaddingTop();
                     int realTopPadding = pTop;
                     if (hasStories && !rightSlidingDialogContainer.hasFragment() && !fixScrollYAfterArchiveOpened) {
-                        pTop -= dp(DialogStoriesCell.HEIGHT_IN_DP);
+                        pTop -= getMDGramStoriesHeight();
                     }
                     boolean hasHiddenArchive = !fixScrollYAfterArchiveOpened && viewPage.dialogsType == DIALOGS_TYPE_DEFAULT && !onlySelect && folderId == 0 && communityId == 0 && getMessagesController().hasHiddenArchive() && viewPage.archivePullViewState == ARCHIVE_ITEM_STATE_HIDDEN;
                     if ((hasHiddenArchive || (hasStories && !rightSlidingDialogContainer.hasFragment())) && dy < 0) {
@@ -4344,7 +4351,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                                     canScrollDy -= getSearchFieldReservedHeight();
                                 }
                                 if (hasStories && (viewPage.scroller.isRunning() || dialogStoriesCell.isExpanded()) && !rightSlidingDialogContainer.hasFragment() && !fixScrollYAfterArchiveOpened) {
-                                    canScrollDy += dp(DialogStoriesCell.HEIGHT_IN_DP);
+                                    canScrollDy += getMDGramStoriesHeight();
                                 }
                                 if ((viewPage.scroller.isRunning() || dialogStoriesCell.isExpanded()) && !rightSlidingDialogContainer.hasFragment() && !fixScrollYAfterArchiveOpened && !(actionBar != null && actionBar.isActionModeShowed())) {
                                     canScrollDy += getSearchFieldReservedHeight();
@@ -4413,7 +4420,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                                 }
                             }
                             if (hasStories && !rightSlidingDialogContainer.hasFragment() && !fixScrollYAfterArchiveOpened) {
-                                pTop += dp(DialogStoriesCell.HEIGHT_IN_DP);
+                                pTop += getMDGramStoriesHeight();
                             }
                             float k = 1f + ((firstView.getTop() - pTop) / (float) firstView.getMeasuredHeight());
                             if (k > 1f) {
@@ -4874,6 +4881,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         contentView.addView(floatingButtonStories, FragmentFloatingButton.createSubButtonLayoutParams());
 
         floatingButton3 = new FragmentFloatingButton(context, resourceProvider);
+        if (org.telegram.messenger.MDGramConfig.useLiquidGlass()) {
+            floatingButton3.setupMDGramGlass(iBlur3FactoryLiquidGlass);
+            floatingButtonStories.setupMDGramGlass(iBlur3FactoryLiquidGlass);
+        }
         contentView.addView(floatingButton3, FragmentFloatingButton.createDefaultLayoutParams());
         floatingButton3.setOnClickListener(v -> {
             if (parentLayout != null && parentLayout.isInPreviewMode()) {
@@ -5316,7 +5327,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         if (fragmentSearchField != null) {
-            fragmentSearchField.setupBlurredBackground(iBlur3FactoryLiquidGlass.create(fragmentSearchField, BlurredBackgroundProviderImpl.topPanel(resourceProvider)));
+            fragmentSearchField.setupBlurredBackground(iBlur3FactoryLiquidGlass.create(fragmentSearchField, org.telegram.ui.Components.MDGramGlass.material(resourceProvider, true)));
         }
 
         dialogStoriesCell = new DialogStoriesCell(context, this, currentAccount, isArchive() ? DialogStoriesCell.TYPE_ARCHIVE : DialogStoriesCell.TYPE_DIALOGS) {
@@ -5720,7 +5731,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     }
                 }
                 if (actionBar.getBackButton() != null) {
-                    actionBar.getBackButton().setAlpha(progress == 1f ? 0f : 1f);
+                    actionBar.getBackButton().setAlpha(hasMainTabs && org.telegram.messenger.MDGramConfig.useLiquidGlass() ? 1f : progress == 1f ? 0f : 1f);
                 }
 
                 if (folderId != 0 || communityId != 0) {
@@ -5800,6 +5811,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         checkUi_mainTabsVisible();
         checkUi_forwardCommentFieldVisible();
         checkUi_searchFieldStyle();
+
+        if (hasMainTabs && org.telegram.messenger.MDGramConfig.useLiquidGlass()) {
+            actionBar.centerTitle();
+            actionBar.setupGlass(iBlur3FactoryLiquidGlass,
+                    org.telegram.ui.Components.MDGramGlass.material(resourceProvider, true));
+            actionBar.setGlassCornerRadius(org.telegram.messenger.MDGramConfig.useRoundedInterface() ? 23 : 0);
+            if (dialogStoriesCell != null) dialogStoriesCell.setupMDGramGlass(iBlur3FactoryLiquidGlass, resourceProvider);
+        }
 
         ViewCompat.setOnApplyWindowInsetsListener(fragmentView, this::onApplyWindowInsets);
         return fragmentView;
@@ -5909,7 +5928,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 }
 
                 final float p = progressToActionMode == 1f ? 1 :
-                    Utilities.clamp(-scrollYOffset / dp(DialogStoriesCell.HEIGHT_IN_DP), 1f, 0f);
+                    Utilities.clamp(-scrollYOffset / getMDGramStoriesHeight(), 1f, 0f);
 
                 if (p < dialogStoriesCell.K) {
                     viewPage.scroller.smoothScrollBy(-scrollY);
@@ -5924,16 +5943,25 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         return false;
     }
 
+    private int getMDGramStoriesGap() {
+        return hasMainTabs && org.telegram.messenger.MDGramConfig.useLiquidGlass() ? dp(8) : 0;
+    }
+
+    private int getMDGramStoriesHeight() {
+        return dp(DialogStoriesCell.HEIGHT_IN_DP) + getMDGramStoriesGap();
+    }
+
     private int getMaxScrollYOffsetWithoutSearch() {
         if (hasStories) {
-            return dp(DialogStoriesCell.HEIGHT_IN_DP);
+            return getMDGramStoriesHeight();
         } else {
             return 0;
         }
     }
 
     private int getMaxScrollYOffset() {
-        return getMaxScrollYOffsetWithoutSearch() + getSearchFieldReservedHeight();
+        return getMaxScrollYOffsetWithoutSearch()
+                + (hasMainTabs && org.telegram.messenger.MDGramConfig.useLiquidGlass() ? 0 : getSearchFieldReservedHeight());
     }
 
     public boolean isStarsSubscriptionHintVisible() {
@@ -6744,7 +6772,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
         float storiesHeight = 0;
         if (hasStories) {
-            storiesHeight = dp(DialogStoriesCell.HEIGHT_IN_DP);
+            storiesHeight = getMDGramStoriesHeight();
         }
         float totalOffset;
         if (hasStories) {
@@ -7211,6 +7239,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     @Override
     public void onResume() {
         super.onResume();
+        if (fragmentSearchField != null && mdgramGlassSearch != org.telegram.messenger.MDGramConfig.useLiquidGlass()) {
+            mdgramGlassSearch = org.telegram.messenger.MDGramConfig.useLiquidGlass();
+            iBlur3FactoryLiquidGlass.setLiquidGlassEffectAllowed(org.telegram.ui.Components.MDGramGlass.useLens());
+            iBlur3FactoryLiquidGlass.unsubscribeView(fragmentSearchField);
+            fragmentSearchField.setupBlurredBackground(iBlur3FactoryLiquidGlass.create(fragmentSearchField, org.telegram.ui.Components.MDGramGlass.material(resourceProvider, true)));
+            checkUi_searchFieldStyle();
+        }
         if (filterTabsView != null) {
             filterTabsView.refreshAppearance();
             updateFilterTabs(true, false);
@@ -7394,7 +7429,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     (actionBar != null ? actionBar.getMeasuredHeight() : 0) +
                     (filterTabsView != null && filterTabsView.getVisibility() == View.VISIBLE && !foldersAtBottom ? filterTabsView.getMeasuredHeight() : 0) +
                     (topPanelLayout != null ? topPanelLayout.getHeight() : 0) +
-                    (dialogStoriesCell != null && dialogStoriesCellVisible ? (int) ((1f - dialogStoriesCell.getCollapsedProgress()) * dp(DialogStoriesCell.HEIGHT_IN_DP)) : 0) +
+                    (dialogStoriesCell != null && dialogStoriesCellVisible ? (int) ((1f - dialogStoriesCell.getCollapsedProgress()) * getMDGramStoriesHeight()) : 0) +
                     getSearchFieldReservedHeight()
                 );
             }
@@ -7774,7 +7809,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (searchViewPager != null) {
                 animators.add(ObjectAnimator.ofFloat(searchViewPager, View.ALPHA, show ? 1.0f : 0.0f));
                 if (hasStories) {
-                    float translationY = dp(DialogStoriesCell.HEIGHT_IN_DP) + scrollYOffset + getSearchFieldReservedHeight();
+                    float translationY = getMDGramStoriesHeight() + scrollYOffset + getSearchFieldReservedHeight();
                     animators.add(ObjectAnimator.ofFloat(searchViewPager, SEARCH_TRANSLATION_Y, show ? translationY : 0, show ? 0 : translationY));
                 }
                 if (!budget) {
@@ -10019,7 +10054,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         int position = viewPages[0].dialogsType == 0 && hasHiddenArchive() && viewPages[0].archivePullViewState == ARCHIVE_ITEM_STATE_HIDDEN ? 1 : 0;
         int offset = 0;
         if (hasStories && !expandStories && !dialogStoriesCell.isExpanded()) {
-            offset = -dp(DialogStoriesCell.HEIGHT_IN_DP);
+            offset = -getMDGramStoriesHeight();
         }
         if (animated) {
             viewPages[0].scrollHelper.setScrollDirection(RecyclerAnimationScrollHelper.SCROLL_DIRECTION_UP);
@@ -13175,9 +13210,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     }
                     if (!newVisibility) {
                         setScrollY(0);
-                        scrollAdditionalOffset = dp(DialogStoriesCell.HEIGHT_IN_DP);
+                        scrollAdditionalOffset = getMDGramStoriesHeight();
                     } else {
-                        scrollAdditionalOffset = -dp(DialogStoriesCell.HEIGHT_IN_DP);
+                        scrollAdditionalOffset = -getMDGramStoriesHeight();
                         setScrollY(-getMaxScrollYOffsetWithoutSearch());
                     }
                     for (int i = 0; i < viewPages.length; i++) {
@@ -13200,7 +13235,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             if (!newVisibility) {
                 setScrollY(0);
             } else {
-                scrollAdditionalOffset = -dp(DialogStoriesCell.HEIGHT_IN_DP);
+                scrollAdditionalOffset = -getMDGramStoriesHeight();
                 setScrollY(-getMaxScrollYOffset());
             }
             for (int i = 0; i < viewPages.length; i++) {
@@ -14360,7 +14395,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     }
 
     private void checkUi_searchFieldStyle() {
-        fragmentSearchField.setBlurredBackgroundVisibility(animatorSearchVisible.getFloatValue());
+        fragmentSearchField.setBlurredBackgroundVisibility(org.telegram.messenger.MDGramConfig.useLiquidGlass() ? 1f : animatorSearchVisible.getFloatValue());
     }
 
     private void checkUi_searchFieldHint() {
@@ -14465,6 +14500,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private final @NonNull BlurredBackgroundDrawableViewFactory iBlur3FactoryBlur;
     private final @NonNull BlurredBackgroundDrawableViewFactory iBlur3FactoryLiquidGlass;
     private final @NonNull BlurredBackgroundDrawableViewFactory iBlur3FactoryFade;
+    private boolean mdgramGlassSearch;
 
 
     private IBlur3Capture iBlur3Capture;
@@ -14477,12 +14513,30 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         iBlur3Positions.add(iBlur3PositionMainTabs);
     }
 
+    private boolean mdgramGlassPanelVisible;
+    private final RectF mdgramGlassPanelRect = new RectF();
+
+    public void setMDGramGlassPanelVisible(boolean visible) {
+        mdgramGlassPanelVisible = visible;
+        blur3_InvalidateBlur();
+        if (fragmentView != null) fragmentView.invalidate();
+    }
+
     private void blur3_InvalidateBlur() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || scrollableViewNoiseSuppressor == null || fragmentView == null || actionBar == null) {
             return;
         }
 
         iBlur3Positions.clear();
+        if (mdgramGlassPanelVisible && org.telegram.messenger.MDGramConfig.useLiquidGlass()) {
+            mdgramGlassPanelRect.set(0, 0, fragmentView.getMeasuredWidth(), fragmentView.getMeasuredHeight());
+            iBlur3Positions.add(mdgramGlassPanelRect);
+            scrollableViewNoiseSuppressor.setupRenderNodes(iBlur3Positions, 1);
+            scrollableViewNoiseSuppressor.invalidateResultRenderNodes(iBlur3Capture, fragmentView.getMeasuredWidth(), fragmentView.getMeasuredHeight());
+            iBlur3SourceGlass.setSize(fragmentView.getMeasuredWidth(), fragmentView.getMeasuredHeight());
+            iBlur3SourceGlass.updateDisplayListIfNeeded();
+            return;
+        }
         iBlur3Positions.add(iBlur3PositionActionBar);
         iBlur3Positions.add(iBlur3PositionMainTabs);
 
@@ -14513,7 +14567,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
         final int actionBarHeight = actionBar.getMeasuredHeight()
             + getSearchFieldReservedHeight()
-            + dp(hasStories ? DialogStoriesCell.HEIGHT_IN_DP : 0)
+            + (hasStories ? getMDGramStoriesHeight() : 0)
             + (filterTabsView != null && filterTabsView.getVisibility() == View.VISIBLE ? filterTabsView.getMeasuredHeight() : 0)
             + (topPanelLayout != null && topPanelLayout.getVisibility() == View.VISIBLE ? topPanelLayout.getSumHeightOfAllVisibleChild() : 0)
             + ((int) scrollYOffset);
@@ -14539,6 +14593,10 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             hasBottomBlur = true;
         }
 
+        if (hasBottomBlur && org.telegram.messenger.MDGramConfig.useLiquidGlass()) {
+            includeMDGramFloatingButton(floatingButton3);
+            includeMDGramFloatingButton(floatingButtonStories);
+        }
         scrollableViewNoiseSuppressor.setupRenderNodes(iBlur3Positions, hasBottomBlur ? 2 : 1);
         scrollableViewNoiseSuppressor.invalidateResultRenderNodes(iBlur3Capture, fragmentView.getMeasuredWidth(), fragmentView.getMeasuredHeight());
 
@@ -14565,6 +14623,16 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     @Override
     public BlurredBackgroundSourceRenderNode getGlassSource() {
         return iBlur3SourceGlass;
+    }
+
+    private final RectF mdgramFloatingButtonRect = new RectF();
+
+    private void includeMDGramFloatingButton(View button) {
+        if (button != null && button.getVisibility() == View.VISIBLE && button.getAlpha() > 0
+                && fragmentView instanceof ViewGroup
+                && ViewPositionWatcher.computeRectInParent(button, (ViewGroup) fragmentView, mdgramFloatingButtonRect)) {
+            iBlur3PositionMainTabs.union(mdgramFloatingButtonRect);
+        }
     }
 
     @Override

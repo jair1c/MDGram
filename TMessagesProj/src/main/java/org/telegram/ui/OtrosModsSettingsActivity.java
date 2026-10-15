@@ -62,10 +62,12 @@ public class OtrosModsSettingsActivity extends BaseFragment {
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(content, new FrameLayout.LayoutParams(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        org.telegram.ui.Components.MDGramAppearance.settingsPage(root, content, getResourceProvider());
 
         LinearLayout group = new LinearLayout(context);
         group.setOrientation(LinearLayout.VERTICAL);
         group.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        org.telegram.ui.Components.MDGramAppearance.settingsGroup(group, getResourceProvider());
         content.addView(group);
 
         // Notificación persistente (FUNCIONAL → MDGramResidentService)

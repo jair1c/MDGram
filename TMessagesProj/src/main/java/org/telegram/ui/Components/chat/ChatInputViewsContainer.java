@@ -83,8 +83,9 @@ public class ChatInputViewsContainer extends FrameLayout {
     private BlurredBackgroundDrawable underKeyboardBackgroundDrawable;
     public void setInputIslandBubbleDrawable(BlurredBackgroundDrawable drawable) {
         blurredBackgroundDrawable = drawable;
-        blurredBackgroundDrawable.setPadding(dp(7));
-        blurredBackgroundDrawable.setRadius(dp(INPUT_BUBBLE_RADIUS));
+        boolean rounded = org.telegram.messenger.MDGramConfig.useRoundedInterface();
+        blurredBackgroundDrawable.setPadding(rounded ? dp(7) : 0);
+        blurredBackgroundDrawable.setRadius(rounded ? dp(INPUT_BUBBLE_RADIUS) : 0);
     }
 
     public void setUnderKeyboardBackgroundDrawable(BlurredBackgroundDrawable drawable) {
@@ -261,9 +262,14 @@ public class ChatInputViewsContainer extends FrameLayout {
             // color del panel, desde el tope del input hasta el borde inferior (cubre también el área
             // de la barra de navegación), sin esquinas redondeadas ni blur.
             if (inputBubbleHeightRound > 0) {
-                flatBgPaint.setColor(org.telegram.ui.ActionBar.Theme.getColor(org.telegram.ui.ActionBar.Theme.key_chat_messagePanelBackground));
                 final int barTop = getMeasuredHeight() - inputBubbleHeightRound - Math.round(maxBottomInset);
-                canvas.drawRect(0, barTop, getMeasuredWidth(), getMeasuredHeight(), flatBgPaint);
+                if (org.telegram.messenger.MDGramConfig.useLiquidGlass() && blurredBackgroundDrawable != null) {
+                    blurredBackgroundDrawable.setBounds(0, barTop, getMeasuredWidth(), getMeasuredHeight());
+                    blurredBackgroundDrawable.draw(canvas);
+                } else {
+                    flatBgPaint.setColor(org.telegram.ui.ActionBar.Theme.getColor(org.telegram.ui.ActionBar.Theme.key_chat_messagePanelBackground));
+                    canvas.drawRect(0, barTop, getMeasuredWidth(), getMeasuredHeight(), flatBgPaint);
+                }
             }
         } else {
             underKeyboardBackgroundDrawable.setBounds(

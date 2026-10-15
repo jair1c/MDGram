@@ -3602,6 +3602,11 @@ public class ChatActivityEnterView extends FrameLayout implements
                 updateAttachButtonTranslationX();
             }
         };
+        sendButton.setMDGramTransparentPlane(true);
+        if (parentFragment != null && org.telegram.messenger.MDGramConfig.useLiquidGlass()) {
+            sendButton.setBlurredBackgroundDrawable(parentFragment.glassBackgroundDrawableFactory.create(
+                    sendButton, MDGramGlass.material(resourcesProvider, false)));
+        }
         sendButton.setVisibility(INVISIBLE);
         sendButton.setContentDescription(getString(R.string.Send));
         sendButton.setSoundEffectsEnabled(false);
@@ -15496,6 +15501,11 @@ public class ChatActivityEnterView extends FrameLayout implements
             updateColors();
             checkBackgroundRect();
             if (isNewDesignSendButton) {
+                if (mdgramTransparentPlane && blurredBackgroundDrawable != null) {
+                    backgroundRect.round(AndroidUtilities.rectTmp2);
+                    blurredBackgroundDrawable.setBounds(AndroidUtilities.rectTmp2);
+                    blurredBackgroundDrawable.draw(canvas);
+                }
                 canvas.drawRoundRect(backgroundRect, dp(RADIUS), dp(RADIUS), backgroundPaint);
             }
 
@@ -15755,17 +15765,29 @@ public class ChatActivityEnterView extends FrameLayout implements
         }
 
         private int drawableColor;
+        private boolean mdgramTransparentPlane;
+
+        public void setMDGramTransparentPlane(boolean enabled) {
+            mdgramTransparentPlane = enabled;
+            updateColors();
+            invalidate();
+        }
 
         public void updateColors() {
-            int color = isNewDesignSendButton ? Color.WHITE : Theme.getColor(Theme.key_chat_messagePanelSend, resourcesProvider);
+            int color = mdgramTransparentPlane
+                    ? ((resourcesProvider != null ? resourcesProvider.isDark() : Theme.isCurrentThemeDark()) ? Color.WHITE : Color.BLACK)
+                    : isNewDesignSendButton ? Color.WHITE : Theme.getColor(Theme.key_chat_messagePanelSend, resourcesProvider);
             if (color != drawableColor) {
                 drawableColor = color;
                 drawable.setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN));
                 int c = Theme.getColor(Theme.key_glass_defaultIcon, resourcesProvider);
                 inactiveDrawable.setColorFilter(new PorterDuffColorFilter(Color.argb(0xb4, Color.red(c), Color.green(c), Color.blue(c)), PorterDuff.Mode.SRC_IN));
-                drawableInverse.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_chat_messagePanelVoicePressed, resourcesProvider), PorterDuff.Mode.SRC_IN));
+                drawableInverse.setColorFilter(new PorterDuffColorFilter(mdgramTransparentPlane ? color : Theme.getColor(Theme.key_chat_messagePanelVoicePressed, resourcesProvider), PorterDuff.Mode.SRC_IN));
             }
-            if (isNewDesignSendButton) {
+            if (mdgramTransparentPlane) {
+                backgroundPaint.setColor(Color.TRANSPARENT);
+                count.setTextColor(drawableColor);
+            } else if (isNewDesignSendButton) {
                 backgroundPaint.setColor(Theme.getColor(Theme.key_chat_messagePanelSend, resourcesProvider));
             } else if (shouldDrawBackground()) {
                 backgroundPaint.setColor(getFillColor());

@@ -43,7 +43,8 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
     public void setRoundedSquare(boolean roundedSquare) {
         this.roundedSquare = roundedSquare;
         if (!isSubButton) {
-            setOutlineProvider(roundedSquare ? ViewOutlineProvider.BACKGROUND : ViewOutlineProviderImpl.BOUNDS_OVAL);
+            setOutlineProvider(mdgramGlassBackground != null ? null
+                    : roundedSquare ? ViewOutlineProvider.BACKGROUND : ViewOutlineProviderImpl.BOUNDS_OVAL);
             updateColors();
         }
     }
@@ -160,9 +161,31 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
 
     private BlurredBackgroundSourceColor iBlur3SourceColor;
     private BlurredBackgroundDrawable iBlur3Background;
+    private BlurredBackgroundDrawable mdgramGlassBackground;
+
+    public void setupMDGramGlass(org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory factory) {
+        mdgramGlassBackground = factory.create(this, MDGramGlass.material(resourcesProvider, false));
+        mdgramGlassBackground.setPadding(dp(2));
+        // The glass drawable already paints its shadow, just like the camera button.
+        setOutlineProvider(null);
+        setElevation(0);
+        setTranslationZ(0);
+        updateColors();
+    }
     private BlurredBackgroundColorProviderThemed iBlur3ColorProviderTabs;
 
     public void updateColors() {
+        if (mdgramGlassBackground != null) {
+            mdgramGlassBackground.updateColors();
+            mdgramGlassBackground.setRadius(roundedSquare ? dp(16)
+                    : getWidth() > 0 ? Math.min(getWidth(), getHeight()) / 2f : dp(isSubButton ? 24 : 28));
+            int accent = Theme.getColor(Theme.key_windowBackgroundWhiteBlueText, resourcesProvider);
+            imageView.setColorFilter(accent, PorterDuff.Mode.SRC_IN);
+            progressView.setProgressColor(accent);
+            setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector, resourcesProvider), 1));
+            invalidate();
+            return;
+        }
         if (isSubButton) {
             imageView.setColorFilter(Theme.getColor(Theme.key_actionBarDefaultIcon, resourcesProvider), PorterDuff.Mode.SRC_IN);
             progressView.setProgressColor(Theme.getColor(Theme.key_actionBarDefaultIcon, resourcesProvider));
@@ -223,6 +246,9 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
+        if (mdgramGlassBackground != null) {
+            mdgramGlassBackground.setRadius(roundedSquare ? dp(16) : Math.min(w, h) / 2f);
+        }
         if (iBlur3Background != null) {
             iBlur3Background.setBounds(0, 0, w, h);
         }
@@ -230,7 +256,10 @@ public class FragmentFloatingButton extends FrameLayout implements FactorAnimato
 
     @Override
     public void draw(@NonNull Canvas canvas) {
-        if (iBlur3Background != null) {
+        if (mdgramGlassBackground != null) {
+            mdgramGlassBackground.setBounds(0, 0, getWidth(), getHeight());
+            mdgramGlassBackground.draw(canvas);
+        } else if (iBlur3Background != null) {
             iBlur3Background.draw(canvas);
         }
         super.draw(canvas);

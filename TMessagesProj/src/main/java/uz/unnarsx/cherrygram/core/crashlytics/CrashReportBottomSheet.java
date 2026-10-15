@@ -50,7 +50,7 @@ public class CrashReportBottomSheet extends OnceBottomSheetHelper {
         TextView title = new TextView(activity);
         title.setGravity(Gravity.CENTER_HORIZONTAL);
         title.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
-        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 22);
         title.setTypeface(AndroidUtilities.bold());
         title.setText(getString(R.string.CG_AppCrashed));
         linearLayout.addView(title, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 21, 20, 21, 0));
@@ -80,7 +80,7 @@ public class CrashReportBottomSheet extends OnceBottomSheetHelper {
         });
         linearLayout.addView(cancelButton, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48, 0, 16, 0, 16, 16));
 
-        ScrollView scrollView = new ScrollView(activity);
+        ScrollView scrollView = new org.telegram.ui.Components.MDGramGlassSheetView(activity, fragment, this, resourcesProvider);
         scrollView.addView(frameLayout);
         setCustomView(scrollView);
 

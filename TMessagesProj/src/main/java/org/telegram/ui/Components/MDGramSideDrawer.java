@@ -11,6 +11,12 @@ import android.content.SharedPreferences;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.Canvas;
+import android.os.Build;
+import org.telegram.ui.MainTabsActivity;
+import org.telegram.ui.Components.blur3.BlurredBackgroundDrawableViewFactory;
+import org.telegram.ui.Components.blur3.drawable.BlurredBackgroundDrawable;
+import org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -90,13 +96,40 @@ public class MDGramSideDrawer extends FrameLayout {
         return view;
     }
 
+    private BlurredBackgroundDrawable glassBackdrop;
+    private View glassSourceView;
+    private final int[] glassPanelPosition = new int[2];
+    private final int[] glassRootPosition = new int[2];
+
+    private void updateModalMaterial() {
+        glassBackdrop = null;
+        glassSourceView = null;
+        if (org.telegram.messenger.MDGramConfig.useLiquidGlass() && Build.VERSION.SDK_INT >= 31
+                && activity.getActionBarLayout().getLastFragment() instanceof MainTabsActivity) {
+            MainTabsActivity home = (MainTabsActivity) activity.getActionBarLayout().getLastFragment();
+            home.setMDGramGlassPanelVisible(true);
+            BlurredBackgroundSourceRenderNode source = home.getMDGramGlassSource();
+            if (source != null) {
+                BlurredBackgroundDrawableViewFactory factory = new BlurredBackgroundDrawableViewFactory(source);
+                factory.setLiquidGlassEffectAllowed(MDGramGlass.useLens());
+                glassBackdrop = factory.create(panel, MDGramGlass.material(null, false));
+                glassBackdrop.setRadius(dp(30));
+                glassBackdrop.setPadding(0);
+                glassSourceView = home.getFragmentView();
+                panel.setBackground(glassBackdrop);
+                return;
+            }
+        }
+        panel.setBackground(Theme.createRoundRectDrawable(dp(30), Theme.getColor(Theme.key_windowBackgroundWhite)));
+    }
+
     private void buildModalContent() {
         modalTexts.clear();
         panel.removeAllViews();
         itemIcons.clear();
         itemTexts.clear();
         panel.setTranslationX(0);
-        panel.setBackground(Theme.createRoundRectDrawable(dp(30), Theme.getColor(Theme.key_windowBackgroundWhite)));
+        updateModalMaterial();
         int width = Math.min(dp(420), AndroidUtilities.displaySize.x - dp(40));
         panel.setLayoutParams(new FrameLayout.LayoutParams(width, LayoutHelper.WRAP_CONTENT, Gravity.CENTER));
         ScrollView scroll = new ScrollView(activity) {
@@ -199,7 +232,17 @@ public class MDGramSideDrawer extends FrameLayout {
         scrim.setOnClickListener(v -> close());
         addView(scrim, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
-        panel = new FrameLayout(activity);
+        panel = new FrameLayout(activity) {
+            @Override public void draw(Canvas canvas) {
+                if (glassBackdrop != null && glassSourceView != null) {
+                    getLocationOnScreen(glassPanelPosition);
+                    glassSourceView.getLocationOnScreen(glassRootPosition);
+                    glassBackdrop.setSourceOffset(glassPanelPosition[0] - glassRootPosition[0],
+                            glassPanelPosition[1] - glassRootPosition[1]);
+                }
+                super.draw(canvas);
+            }
+        };
         panel.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
         panel.setTranslationX(-panelWidth);
         panel.setElevation(dp(8));
@@ -383,7 +426,7 @@ public class MDGramSideDrawer extends FrameLayout {
     public void updateColors() {
         if (panel != null) {
             if (modalStyle) {
-                panel.setBackground(Theme.createRoundRectDrawable(dp(30), Theme.getColor(Theme.key_windowBackgroundWhite)));
+                updateModalMaterial();
             } else {
                 panel.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
             }
@@ -525,6 +568,8 @@ public class MDGramSideDrawer extends FrameLayout {
             buildModalContent();
             panel.setAlpha(0);
         } else {
+            glassBackdrop = null;
+            glassSourceView = null;
             panel.removeAllViews();
             itemIcons.clear();
             itemTexts.clear();
@@ -570,6 +615,11 @@ public class MDGramSideDrawer extends FrameLayout {
             public void onAnimationEnd(Animator animation) {
                 if (!open) {
                     setVisibility(GONE);
+                    if (activity.getActionBarLayout().getLastFragment() instanceof MainTabsActivity) {
+                        ((MainTabsActivity) activity.getActionBarLayout().getLastFragment()).setMDGramGlassPanelVisible(false);
+                    }
+                    glassBackdrop = null;
+                    glassSourceView = null;
                 }
             }
         });

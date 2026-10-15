@@ -260,6 +260,12 @@ public class ActionBar extends FrameLayout implements FactorAnimator.Target, The
         }
     }
 
+    public void setGlassCornerRadius(int radius) {
+        if (glassDrawable != null) glassDrawable.setRadius(dp(radius));
+        if (glassDrawableBack != null) glassDrawableBack.setRadius(dp(radius));
+        if (glassDrawableMenu != null) glassDrawableMenu.setRadius(dp(radius));
+    }
+
     public INavigationLayout.BackButtonState getBackButtonState() {
         if (backButtonDrawable instanceof INavigationLayout.IBackButtonDrawable) {
             return ((INavigationLayout.IBackButtonDrawable) backButtonDrawable).getBackButtonState();

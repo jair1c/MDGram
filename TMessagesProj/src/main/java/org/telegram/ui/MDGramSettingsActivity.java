@@ -27,6 +27,12 @@ import org.telegram.ui.Components.LayoutHelper;
 // del APK original (plantillas blancas) tintados con el color de cada sección.
 public class MDGramSettingsActivity extends BaseFragment implements MainTabsActivity.TabFragmentDelegate {
     private final boolean hasMainTabs;
+    private org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode glassSource;
+
+    @Override
+    public org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode getGlassSource() {
+        return glassSource;
+    }
 
     public MDGramSettingsActivity() {
         this(false);
@@ -71,7 +77,24 @@ public class MDGramSettingsActivity extends BaseFragment implements MainTabsActi
             }
         });
 
-        FrameLayout root = new FrameLayout(context);
+        if (android.os.Build.VERSION.SDK_INT >= 31 && hasMainTabs
+                && org.telegram.messenger.MDGramConfig.useLiquidGlass()) {
+            glassSource = new org.telegram.ui.Components.blur3.source.BlurredBackgroundSourceRenderNode(null);
+            glassSource.setBlur(dp(4));
+        }
+        FrameLayout root = new FrameLayout(context) {
+            @Override protected void dispatchDraw(android.graphics.Canvas canvas) {
+                if (glassSource != null && canvas.isHardwareAccelerated() && getWidth() > 0 && getHeight() > 0) {
+                    android.graphics.Canvas backdrop = glassSource.beginRecording(getWidth(), getHeight());
+                    // Only the strip behind the tabs needs recording; the tabs live in the parent.
+                    backdrop.clipRect(0, Math.max(0, getHeight() - dp(180)), getWidth(), getHeight());
+                    backdrop.drawColor(getThemedColor(Theme.key_windowBackgroundWhite));
+                    super.dispatchDraw(backdrop);
+                    glassSource.endRecording();
+                }
+                super.dispatchDraw(canvas);
+            }
+        };
         root.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
         if (hasMainTabs) {
             actionBar.setVisibility(View.GONE);

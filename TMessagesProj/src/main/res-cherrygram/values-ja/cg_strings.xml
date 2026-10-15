@@ -91,7 +91,7 @@
     <string name="CG_PushService">Cherrygramプッシュサービス</string>
     <string name="CG_Kaboom">この機能はシステムの設定を通じて、Cherrygramのパスワードなしでアクセスすることができます。この機能はローカル(Cherrygram)のデータを完全に消去します。緊急時に使用できます。</string>
     <string name="CG_AppCrashed">問題が発生しました</string>
-    <string name="CG_AppCrashedDesc">Cherrygramが動作しなくなりました。このバグをできるだけ早く修正できるよう、開発者にログを送信してください。</string>
+    <string name="CG_AppCrashedDesc">MDGramが動作しなくなりました。このバグをできるだけ早く修正できるよう、開発者にログを送信してください。</string>
     <string name="CG_CopyReportDetails">レポートの詳細をコピー</string>
     <string name="CG_ReportDetailsCopied">レポートの詳細をクリップボードにコピーしました。</string>
     <string name="CG_TranslationLanguage">翻訳する言語</string>

@@ -32,6 +32,11 @@ public class BlurredBackgroundDrawableViewFactory {
         this.parent = parent;
     }
 
+    /** Replace a view's backdrop without retaining its previous position callback. */
+    public void unsubscribeView(View view) {
+        if (viewPositionWatcher != null) viewPositionWatcher.unsubscribe(view);
+    }
+
     private @Nullable ReferenceList<BlurredBackgroundDrawable> linkedDrawables;
     private @Nullable ReferenceList<View> linkedViews;
     private @Nullable ViewPositionWatcher viewPositionWatcher;

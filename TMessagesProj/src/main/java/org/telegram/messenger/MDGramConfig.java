@@ -58,6 +58,18 @@ public class MDGramConfig {
         return prefs().getBoolean("use_new_navigation", false);
     }
 
+    public static boolean useRoundedInterface() {
+        return useNewNavigation();
+    }
+
+    public static boolean useLiquidGlass() {
+        return prefs().getBoolean("liquid_glass", false);
+    }
+
+    public static void setUseLiquidGlass(boolean value) {
+        prefs().edit().putBoolean("liquid_glass", value).apply();
+    }
+
     public static void setUseNewNavigation(boolean value) {
         prefs().edit().putBoolean("use_new_navigation", value).apply();
     }
@@ -292,11 +304,11 @@ public class MDGramConfig {
     public static final int ACTIONBAR_MATERIAL = 1;
 
     public static int actionBarStyle() {
-        return prefs().getInt("actionbar_style", ACTIONBAR_IOS);
+        return useRoundedInterface() ? ACTIONBAR_MATERIAL : prefs().getInt("actionbar_style", ACTIONBAR_IOS);
     }
 
     public static boolean actionBarStyleIOS() {
-        return actionBarStyle() == ACTIONBAR_IOS;
+        return !useRoundedInterface() && actionBarStyle() == ACTIONBAR_IOS;
     }
 
     public static void setActionBarStyle(int v) {

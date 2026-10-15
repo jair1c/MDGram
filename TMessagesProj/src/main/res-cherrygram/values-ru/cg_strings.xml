@@ -132,7 +132,7 @@
     <string name="CG_PushService">Сервис уведомлений Cherrygram.</string>
     <string name="CG_Kaboom">Доступ к этой функции можно получить без пароля Cherrygram, через системные настройки. \n\nЭта функция **полностью удаляет все данные приложения**. Ее можно использовать в аварийных ситуациях.</string>
     <string name="CG_AppCrashed">Что-то пошло не так</string>
-    <string name="CG_AppCrashedDesc">Cherrygram перестал работать. Пожалуйста, отправьте логи разработчикам, чтобы они как можно скорее исправили эту ошибку.</string>
+    <string name="CG_AppCrashedDesc">MDGram перестал работать. Пожалуйста, отправьте логи разработчикам, чтобы они как можно скорее исправили эту ошибку.</string>
     <string name="CG_CopyReportDetails">Скопировать детали отчёта</string>
     <string name="CG_ReportDetailsCopied">Детали отчёта скопированы в буфер обмена.</string>
     <string name="CG_TranslationLanguage">Язык перевода</string>

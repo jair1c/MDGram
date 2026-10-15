@@ -1,6 +1,6 @@
 {
-  "versionCode": 8,
-  "versionName": "V5.1",
-  "changelog": "MDGram V5.1: nuevo paquete com.mdgram.messenger, navegación clásica/nueva, barra plana corregida, traducción Google/Yandex sin Premium, selección ventana/mensaje, política automática, cancelación y caché por proveedor. Spoilers y guardado de bloques de código corregidos. Consulta las notas para límites y migración.",
+  "versionCode": 9,
+  "versionName": "V5.2",
+  "changelog": "MDGram V5.2: Liquid Glass opcional, estilos plano y píldora independientes, cabeceras segmentadas, contraste del tema oscuro mejorado y avión de envío transparente. Corregido el fondo del aviso al desplazar y girar. Conserva Actualizar One UI. Consulta las notas de compatibilidad y pruebas.",
   "apkUrl": "https://mdgram-web.vercel.app/dl"
 }

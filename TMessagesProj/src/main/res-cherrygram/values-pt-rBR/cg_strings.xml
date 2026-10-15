@@ -107,7 +107,7 @@
 as configurações do sistema. Esta característica apaga completamente todas as suas 
 (Cherrygram\'s) dados. Pode ser utilizado em situações de emergência.</string>
     <string name="CG_AppCrashed">Algo correu mal</string>
-    <string name="CG_AppCrashedDesc">Cherrygram parou de funcionar. Por favor envie os registros para os desenvolvedores pra eles corrigir esse bug o mais breve possível.</string>
+    <string name="CG_AppCrashedDesc">MDGram parou de funcionar. Por favor envie os registros para os desenvolvedores pra eles corrigir esse bug o mais breve possível.</string>
     <string name="CG_CopyReportDetails">Copiar Detalhes do Relatório</string>
     <string name="CG_ReportDetailsCopied">Detalhes de falhas copiados para o Clipboard.</string>
     <string name="CG_TranslationLanguage">Idioma de tradução</string>

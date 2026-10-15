@@ -2744,8 +2744,8 @@ public class ChatActivity extends BaseFragment implements
         super(args);
 
         navbarContentSourceWallpaper = new BlurredBackgroundSourceWrapped();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && SharedConfig.chatBlurEnabled()) {
-            scrollableViewNoiseSuppressor = new DownscaleScrollableNoiseSuppressor();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && (SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass())) {
+            scrollableViewNoiseSuppressor = new DownscaleScrollableNoiseSuppressor(true, false, org.telegram.ui.Components.MDGramGlass.useLens());
 
             recommendedAdditionalSizeY = Math.max(0, dp(48) - Math.min(AndroidUtilities.navigationBarHeight, AndroidUtilities.statusBarHeight));
 
@@ -2755,15 +2755,15 @@ public class ChatActivity extends BaseFragment implements
             glassBackgroundSourceFrostedRenderNode.setUnderSource(navbarContentSourceWallpaper);
 
             glassBackgroundDrawableFactoryFrosted = new BlurredBackgroundDrawableViewFactory(glassBackgroundSourceFrostedRenderNode);
-            glassBackgroundDrawableFactoryFrosted.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+            glassBackgroundDrawableFactoryFrosted.setLiquidGlassEffectAllowed(org.telegram.ui.Components.MDGramGlass.useLens());
 
-            if (LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS)) {
+            if (org.telegram.ui.Components.MDGramGlass.useLens()) {
                 glassBackgroundSourceRenderNode = new BlurredBackgroundSourceRenderNode(navbarContentSourceWallpaper);
                 glassBackgroundSourceRenderNode.setOnDrawablesRelativePositionChangeListener(this::invalidateMergedVisibleBlurredPositionsAndSourcesPositions);
                 glassBackgroundSourceRenderNode.setScrollableNoiseSuppressor(scrollableViewNoiseSuppressor, DownscaleScrollableNoiseSuppressor.DRAW_GLASS);
                 glassBackgroundSourceRenderNode.setUnderSource(navbarContentSourceWallpaper);
                 glassBackgroundDrawableFactory = new BlurredBackgroundDrawableViewFactory(glassBackgroundSourceRenderNode);
-                glassBackgroundDrawableFactory.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+                glassBackgroundDrawableFactory.setLiquidGlassEffectAllowed(org.telegram.ui.Components.MDGramGlass.useLens());
             } else {
                 glassBackgroundSourceRenderNode = null;
                 glassBackgroundDrawableFactory = glassBackgroundDrawableFactoryFrosted;
@@ -3715,6 +3715,7 @@ public class ChatActivity extends BaseFragment implements
         blurredBackgroundColorProvider = new BlurredBackgroundColorProviderThemed(themeDelegate, Theme.key_chat_messagePanelBackground) {
             @Override
             public int getBackgroundColor() {
+                if (org.telegram.messenger.MDGramConfig.useLiquidGlass()) { return org.telegram.ui.Components.MDGramGlass.chatTint(themeDelegate, Theme.key_chat_messagePanelBackground); }
                 if (!BlurredBackgroundProviderImpl.checkBlurEnabled(currentAccount, themeDelegate)) {
                     return ColorUtils.setAlphaComponent(getThemedColor(Theme.key_chat_messagePanelBackground), 255);
                 }
@@ -3729,6 +3730,7 @@ public class ChatActivity extends BaseFragment implements
         blurredBackgroundColorProviderWhite = new BlurredBackgroundColorProviderThemed(themeDelegate, Theme.key_windowBackgroundWhite) {
             @Override
             public int getBackgroundColor() {
+                if (org.telegram.messenger.MDGramConfig.useLiquidGlass()) { return org.telegram.ui.Components.MDGramGlass.chatTint(themeDelegate, Theme.key_windowBackgroundWhite); }
                 if (!BlurredBackgroundProviderImpl.checkBlurEnabled(currentAccount, themeDelegate)) {
                     return ColorUtils.setAlphaComponent(getThemedColor(Theme.key_windowBackgroundWhite), 255);
                 }
@@ -4857,7 +4859,7 @@ public class ChatActivity extends BaseFragment implements
         if (!org.telegram.messenger.MDGramConfig.actionBarStyleIOS()) {
             actionBar.setupGlass(
                 glassBackgroundDrawableFactory,
-                BlurredBackgroundProviderImpl.topPanelChatActivity(themeDelegate),
+                org.telegram.ui.Components.MDGramGlass.chatPanel(themeDelegate),
                 ChatObject.isForum(currentChat));
         }
 
@@ -8112,7 +8114,7 @@ public class ChatActivity extends BaseFragment implements
             hashtagSearchTabs.setTabs(searchViewPager.createTabsView(true, ViewPagerFixed.SELECTOR_TYPE_BUBBLE_STYLE));
             hashtagSearchTabs.setPadding(0, dp(7.66f), 0, dp(7.66f));
             hashtagSearchTabs.setBackground(glassBackgroundDrawableFactory.create(hashtagSearchTabs)
-                .setColorProvider(BlurredBackgroundProviderImpl.topPanelChatActivity(resourceProvider))
+                .setColorProvider(org.telegram.ui.Components.MDGramGlass.chatPanel(resourceProvider))
                 .setRadius(dp(18)).setPadding(dp(7f)));
 
             contentView.addView(hashtagSearchTabs, LayoutHelper.createFrameMarginPx(LayoutHelper.MATCH_PARENT, 50, Gravity.FILL_HORIZONTAL | Gravity.TOP, 0, -dp(5), 0, 0));
@@ -8391,7 +8393,7 @@ public class ChatActivity extends BaseFragment implements
         chatActivityEnterView.setMinimumHeight(AndroidUtilities.dp(51));
         chatActivityEnterView.setAllowStickersAndGifs(true, true, currentEncryptedChat == null || AndroidUtilities.getPeerLayerVersion(currentEncryptedChat.layer) >= 46);
         if (!isReport() && !inPreviewMode && !isInsideContainer) {
-            chatInputViewsContainer.mdFlatBackground = true;
+            chatInputViewsContainer.mdFlatBackground = !org.telegram.messenger.MDGramConfig.useRoundedInterface();
         }
         chatActivityEnterView.shouldDrawBackground = false;
         if (textToSet != null) {
@@ -9353,7 +9355,7 @@ public class ChatActivity extends BaseFragment implements
 
         checkUi_topPanelLayoutWidth();
         topPanelLayout.setBlurredBackground(glassBackgroundDrawableFactory.create(topPanelLayout)
-            .setColorProvider(BlurredBackgroundProviderImpl.topPanelChatActivity(themeDelegate))
+            .setColorProvider(org.telegram.ui.Components.MDGramGlass.chatPanel(themeDelegate))
             .setRadius(dp(18))
             .setPadding(dp(7)));
 
@@ -10366,8 +10368,8 @@ public class ChatActivity extends BaseFragment implements
             checkUi_topFade();
         });
 
-        topicsTabs.setSideMenuBackgroundDrawable(glassBackgroundDrawableFactory.create(topicsTabs, BlurredBackgroundProviderImpl.topPanelChatActivity(themeDelegate)));
-        topicsTabs.setTopMenuBackgroundDrawable(glassBackgroundDrawableFactory.create(topicsTabs, BlurredBackgroundProviderImpl.topPanelChatActivity(themeDelegate)));
+        topicsTabs.setSideMenuBackgroundDrawable(glassBackgroundDrawableFactory.create(topicsTabs, org.telegram.ui.Components.MDGramGlass.chatPanel(themeDelegate)));
+        topicsTabs.setTopMenuBackgroundDrawable(glassBackgroundDrawableFactory.create(topicsTabs, org.telegram.ui.Components.MDGramGlass.chatPanel(themeDelegate)));
 
         int index = 8;
         topicsTabs.setCurrentTopic(getTopicId());
@@ -16352,7 +16354,7 @@ public class ChatActivity extends BaseFragment implements
         int maxAdapterPosition = -1;
         int minAdapterPosition = -1;
 
-        boolean blurEnabled = SharedConfig.chatBlurEnabled();
+        boolean blurEnabled = SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass();
 
         MessageObject messageStarter = isTopic ? topicStarterMessageObject : threadMessageObject;
 
@@ -18814,7 +18816,7 @@ public class ChatActivity extends BaseFragment implements
 
             blurredViewTopOffset = 0;
             blurredViewBottomOffset = 0;
-            if (SharedConfig.chatBlurEnabled() && !isInsideContainer) {
+            if ((SharedConfig.chatBlurEnabled() || org.telegram.messenger.MDGramConfig.useLiquidGlass()) && !isInsideContainer) {
                 if (scrollableViewNoiseSuppressor != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     blurredViewTopOffset = recommendedAdditionalSizeY;
                     blurredViewBottomOffset = recommendedAdditionalSizeY;

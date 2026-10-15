@@ -298,7 +298,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     @Override
     public void onResume() {
         super.onResume();
-        if (tabsView != null && navigationStyle != org.telegram.messenger.MDGramConfig.useNewNavigation()) {
+        if (tabsView != null && (navigationStyle != org.telegram.messenger.MDGramConfig.useNewNavigation()
+                || glassMaterialEnabled != org.telegram.messenger.MDGramConfig.useLiquidGlass()
+                || glassLensEnabled != org.telegram.ui.Components.MDGramGlass.useLens())) {
             tabsView.removeAllViews();
             // Positions have different meanings in the two layouts. Dispose their
             // lifecycle states before binding the new destinations.
@@ -312,6 +314,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             viewPager.rebindCurrentPage();
             selectTab(viewPager.getCurrentPosition(), false);
         }
+        refreshMDGramGlass();
         blur3_updateColors();
         checkContactsTabBadge();
         checkUnreadCount(true);
@@ -437,12 +440,15 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         iBlur3SourceColor.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
 
         final ViewPositionWatcher viewPositionWatcher = new ViewPositionWatcher(contentView);
+        glassPositionWatcher = viewPositionWatcher;
+        glassMaterialEnabled = org.telegram.messenger.MDGramConfig.useLiquidGlass();
+        glassLensEnabled = org.telegram.ui.Components.MDGramGlass.useLens();
 
         BlurredBackgroundDrawableViewFactory iBlur3FactoryGlass = new BlurredBackgroundDrawableViewFactory(iBlur3SourceTabGlass != null ? iBlur3SourceTabGlass : iBlur3SourceColor);
         iBlur3FactoryGlass.setSourceRootView(viewPositionWatcher, contentView);
-        iBlur3FactoryGlass.setLiquidGlassEffectAllowed(LiteMode.isEnabled(LiteMode.FLAG_LIQUID_GLASS));
+        iBlur3FactoryGlass.setLiquidGlassEffectAllowed(org.telegram.ui.Components.MDGramGlass.useLens());
 
-        tabsViewBackground = iBlur3FactoryGlass.create(tabsView, BlurredBackgroundProviderImpl.mainTabs(resourceProvider));
+        tabsViewBackground = iBlur3FactoryGlass.create(tabsView, org.telegram.ui.Components.MDGramGlass.material(resourceProvider, false));
         tabsViewBackground.setRadius(org.telegram.messenger.MDGramConfig.useNewNavigation() ? dp(30) : 0);
         tabsViewBackground.setPadding(0);
         tabsView.setBackground(tabsViewBackground);
@@ -1226,6 +1232,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
     @Override
     public void onFragmentDestroy() {
+        if (glassPositionWatcher != null) glassPositionWatcher.shutdown();
         Bulletin.removeDelegate(this);
         Bulletin.removeDelegate(contentView);
 
@@ -1464,6 +1471,36 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     private BlurredBackgroundDrawable searchButtonBackground;
 
     private boolean navigationStyle;
+    private boolean glassMaterialEnabled;
+    private boolean glassLensEnabled;
+    private ViewPositionWatcher glassPositionWatcher;
+
+    public BlurredBackgroundSourceRenderNode getMDGramGlassSource() {
+        blur3_invalidateBlur();
+        return iBlur3SourceTabGlass;
+    }
+
+    public void setMDGramGlassPanelVisible(boolean visible) {
+        if (dialogsActivity != null) dialogsActivity.setMDGramGlassPanelVisible(visible);
+        if (contentView != null) contentView.invalidate();
+    }
+
+    private void refreshMDGramGlass() {
+        if (tabsView == null || (glassPositionWatcher != null && glassMaterialEnabled == org.telegram.messenger.MDGramConfig.useLiquidGlass()
+                && glassLensEnabled == org.telegram.ui.Components.MDGramGlass.useLens())) return;
+        glassMaterialEnabled = org.telegram.messenger.MDGramConfig.useLiquidGlass();
+        glassLensEnabled = org.telegram.ui.Components.MDGramGlass.useLens();
+        if (glassPositionWatcher == null) glassPositionWatcher = new ViewPositionWatcher(contentView);
+        glassPositionWatcher.unsubscribe(tabsView);
+        BlurredBackgroundDrawableViewFactory factory = new BlurredBackgroundDrawableViewFactory(
+                iBlur3SourceTabGlass != null ? iBlur3SourceTabGlass : iBlur3SourceColor);
+        factory.setSourceRootView(glassPositionWatcher, contentView);
+        factory.setLiquidGlassEffectAllowed(org.telegram.ui.Components.MDGramGlass.useLens());
+        tabsViewBackground = factory.create(tabsView, org.telegram.ui.Components.MDGramGlass.material(resourceProvider, false));
+        tabsViewBackground.setRadius(navigationStyle ? dp(30) : 0);
+        tabsViewBackground.setPadding(0);
+        tabsView.setBackground(tabsViewBackground);
+    }
 
     private void applyNavigationStyle() {
         if (tabsViewBackground != null) {

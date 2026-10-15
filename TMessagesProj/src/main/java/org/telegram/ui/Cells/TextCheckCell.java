@@ -207,8 +207,8 @@ public class TextCheckCell extends FrameLayout {
         textView.setTypeface(typeface);
         valueTextView.setTypeface(typeface);
         // Keep the existing switch geometry and accessibility; use the active theme accent.
-        checkBox.setColors(Theme.key_switchTrack, Theme.key_windowBackgroundWhiteValueText,
-                Theme.key_windowBackgroundWhite, Theme.key_windowBackgroundWhite);
+        checkBox.setColors(Theme.key_switchTrack, Theme.key_switchTrackChecked,
+                Theme.key_windowBackgroundWhite, Theme.key_alwaysWhite);
     }
 
     public void setTypeface(Typeface typeface) {

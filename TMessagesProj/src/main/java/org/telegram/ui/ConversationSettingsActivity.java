@@ -70,6 +70,7 @@ public class ConversationSettingsActivity extends BaseFragment {
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(content, new FrameLayout.LayoutParams(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        org.telegram.ui.Components.MDGramAppearance.settingsPage(root, content, getResourceProvider());
 
         addHeader(context, content, "STICKER SIZE.");
         content.addView(buildStickerSlider(context));
@@ -360,7 +361,14 @@ public class ConversationSettingsActivity extends BaseFragment {
             captions[i] = caption;
             caption.setGravity(Gravity.CENTER);
             box.addView(caption, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 38));
-            card.setOnClickListener(v -> { MDGramConfig.setActionBarStyle(index); refresh.run(); });
+            card.setOnClickListener(v -> {
+                if (MDGramConfig.useRoundedInterface()) {
+                    Toast.makeText(context, "La interfaz de píldora usa la cabecera Cherrygram. Personalízala en el estilo plano.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                MDGramConfig.setActionBarStyle(index);
+                refresh.run();
+            });
         }
         refresh.run();
         return box;
@@ -378,6 +386,7 @@ public class ConversationSettingsActivity extends BaseFragment {
         LinearLayout g = new LinearLayout(context);
         g.setOrientation(LinearLayout.VERTICAL);
         g.setBackgroundColor(getThemedColor(Theme.key_windowBackgroundWhite));
+        org.telegram.ui.Components.MDGramAppearance.settingsGroup(g, getResourceProvider());
         parent.addView(g);
         return g;
     }
@@ -540,6 +549,10 @@ public class ConversationSettingsActivity extends BaseFragment {
     }
 
     private void showActionBarStylePicker() {
+        if (MDGramConfig.useRoundedInterface()) {
+            if (getParentActivity() != null) Toast.makeText(getParentActivity(), "La interfaz de píldora usa la cabecera Cherrygram.", Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (getParentActivity() == null) {
             return;
         }

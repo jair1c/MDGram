@@ -26,7 +26,9 @@ half4 main(in float2 fragCoord) {
   half2 p = fragCoord - center;
   half sd = sdfRect(p, radius);
   half2 uv = fragCoord;
-  if (sd < 0.0) {
+  // The flat interior has normal (0,0,1), hence zero XY refraction.
+  // Only the bevel needs SDF gradients and the optical calculation.
+  if (sd < 0.0 && sd > -thickness) {
     half sdX = sdfRect(p + half2(1.0, 0.0), radius);
     half sdY = sdfRect(p + half2(0.0, 1.0), radius);
 

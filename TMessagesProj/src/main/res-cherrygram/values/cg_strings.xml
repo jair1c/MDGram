@@ -132,8 +132,8 @@
     <string name="CG_RestartToApply">Restart app to apply changes</string>
     <string name="CG_PushService">Cherrygram Push Service.</string>
     <string name="CG_Kaboom">This feature can be accessed without the Cherrygram password, through the system settings. \n\nThis feature **completely erases all your local (Cherrygram\'s) data**. It can be used in emergency situations.</string>
-    <string name="CG_AppCrashed">Something went wrong</string>
-    <string name="CG_AppCrashedDesc">Cherrygram has stopped working. Please send logs to the developers so they can fix this bug as soon as possible.</string>
+    <string name="CG_AppCrashed">MDGram closed unexpectedly</string>
+    <string name="CG_AppCrashedDesc">You can share logs to help us fix the problem or return to MDGram. Nothing is sent unless you choose to share it.</string>
     <string name="CG_CopyReportDetails">Copy Report Details</string>
     <string name="CG_ReportDetailsCopied">Report details copied to clipboard.</string>
     <string name="CG_TranslationLanguage">Translation Language</string>

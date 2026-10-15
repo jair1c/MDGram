@@ -8501,6 +8501,11 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
     }
 
     public boolean onBackPressed(boolean invoked) {
+        // Android's predictive-back callbacks enter here directly.
+        if (sideDrawer != null && sideDrawer.isOpen()) {
+            if (invoked) sideDrawer.close();
+            return false;
+        }
         if (FloatingDebugController.onBackPressed(invoked)) {
             return false;
         }
